@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Lift">
+<meta name="theme-color" content="#f5f0eb">
+<title>Lift</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f0eb;--card:#fff;--card2:#faf8f5;--bdr:#e8e2da;--bdr2:#d4cdc4;--txt:#1a1a1a;--txt2:#5a5550;--txt3:#9a9490;--dim:#b5aea6;--acc:#c45a3c;--acc2:#d4715a;--accbg:#fdf0ec;--accbdr:#f5d5cb;--green:#3a8a5c;--greenbg:#eaf5ef;--greenbdr:#c2e0cd;--blue:#3a6b8a;--bluebg:#eaf0f5;--bluebdr:#c2d4e0;--gold:#b8860b;--goldbg:#fdf5e6;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);--shadow2:0 4px 12px rgba(0,0,0,.08);--r:14px;--rs:10px;--rx:8px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;font-size:15px}
+input,select,button,textarea{font-family:inherit;-webkit-appearance:none;appearance:none}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=number]{-moz-appearance:textfield}
+textarea{resize:none}
+::-webkit-scrollbar{width:0;display:none}
+button{cursor:pointer;border:none;background:none}
+.hidden{display:none!important}
+
+#app{max-width:430px;margin:0 auto;height:100%;display:flex;flex-direction:column;background:var(--bg)}
+.hdr{padding:max(env(safe-area-inset-top),8px) 16px 10px;background:var(--bg);position:sticky;top:0;z-index:100}
+.cyc-btn{display:flex;align-items:center;gap:6px;background:var(--acc);color:#fff;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;margin:0 auto;width:fit-content}
+.cnt{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:85px}
+
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--card);border-top:1px solid var(--bdr);display:flex;justify-content:space-around;padding:6px 0 max(env(safe-area-inset-bottom),12px);z-index:100}
+.nb{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 10px;color:var(--txt3);transition:color .15s}
+.nb.on{color:var(--acc)}
+.nb svg{width:22px;height:22px;opacity:.6}
+.nb.on svg{opacity:1}
+.nl{font-size:10px;font-weight:600;letter-spacing:.3px}
+
+/* Calendar */
+.cal-h{display:flex;justify-content:space-between;align-items:center;padding:12px 16px}
+.cal-m{font-size:18px;font-weight:800}
+.cal-n{display:flex;gap:8px}
+.cal-n button{width:32px;height:32px;border-radius:50%;background:var(--card);border:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;color:var(--txt2)}
+.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 12px 16px}
+.cal-dw{text-align:center;font-size:11px;font-weight:700;color:var(--txt3);padding:8px 0;text-transform:uppercase;letter-spacing:.5px}
+.cal-d{text-align:center;padding:8px 0;border-radius:10px;font-size:14px;font-weight:500;color:var(--txt2);cursor:pointer;position:relative;min-height:40px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.cal-d:active{background:var(--accbg)}
+.cal-d.today{background:var(--acc);color:#fff;font-weight:700;border-radius:50%;width:36px;height:36px;margin:0 auto}
+.cal-d.has-wk::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--acc);position:absolute;bottom:3px}
+.cal-d.done::after{background:var(--green)}
+.cal-d.today.has-wk::after,.cal-d.today.done::after{background:#fff}
+.cal-d.om{color:var(--dim)}
+.cal-d.sel{background:var(--accbg);font-weight:700;color:var(--acc)}
+
+/* Sections */
+.sec{padding:16px 16px 8px;font-size:13px;font-weight:800;color:var(--acc);text-transform:uppercase;letter-spacing:1.5px}
+
+/* Exercise row */
+.exr{display:flex;align-items:center;background:var(--card);margin:0 16px 8px;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);gap:12px;cursor:pointer}
+.exr:active{background:var(--card2)}
+.exr-dn{width:28px;height:28px;border-radius:50%;border:2px solid var(--bdr2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.exr-dn.ck{background:var(--green);border-color:var(--green);color:#fff}
+.exr-i{flex:1;min-width:0}
+.exr-n{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exr-m{font-size:12px;color:var(--txt3);margin-top:2px}
+.exr-sw{width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt3);border-radius:8px;flex-shrink:0}
+.exr-sw:active{background:var(--bg)}
+
+.btn-cmp{display:flex;align-items:center;justify-content:center;gap:8px;margin:20px 16px;padding:16px;border-radius:var(--r);background:var(--green);color:#fff;font-size:16px;font-weight:700;box-shadow:0 4px 12px rgba(58,138,92,.25)}
+.btn-cmp.dn{background:var(--greenbg);color:var(--green);border:2px solid var(--greenbdr);box-shadow:none}
+
+/* Detail header */
+.dh{padding:16px;display:flex;align-items:center;gap:12px}
+.dh-bk{width:36px;height:36px;border-radius:50%;background:var(--card);border:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;color:var(--txt2);flex-shrink:0}
+.dh-t{font-size:20px;font-weight:800;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Guidelines */
+.gbox{margin:0 16px 16px;background:var(--bluebg);border:1px solid var(--bluebdr);border-radius:var(--r);padding:14px 16px}
+.gbox-l{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.gbox-t{font-size:13px;color:var(--txt2);line-height:1.5}
+
+/* Sets */
+.sh{display:grid;grid-template-columns:36px 1fr 1fr 1fr 40px;gap:8px;padding:8px 16px;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px}
+.srow{display:grid;grid-template-columns:36px 1fr 1fr 1fr 40px;gap:8px;padding:8px 16px;align-items:center}
+.snum{width:30px;height:30px;border-radius:50%;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--txt2)}
+.snum.w{background:var(--goldbg);color:var(--gold);font-size:10px}
+.sinp{padding:10px;border-radius:var(--rx);border:1px solid var(--bdr);background:var(--card);color:var(--txt);font-size:15px;text-align:center;font-weight:600;width:100%}
+.sinp:focus{border-color:var(--acc);outline:none;box-shadow:0 0 0 3px var(--accbg)}
+.sinp::placeholder{color:var(--dim);font-weight:400}
+.star{font-size:13px;color:var(--txt3);text-align:center}
+.star b{color:var(--txt);font-weight:700}
+.schk{width:30px;height:30px;border-radius:50%;border:2px solid var(--bdr2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.schk.dn{background:var(--green);border-color:var(--green);color:#fff}
+
+.aset{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;margin:8px 16px;border-radius:var(--rx);border:1.5px dashed var(--bdr2);color:var(--txt3);font-size:13px;font-weight:600;cursor:pointer}
+
+.cmt{margin:16px;padding:12px 14px;border-radius:var(--rs);border:1px solid var(--bdr);background:var(--card);font-size:14px;color:var(--txt);width:calc(100% - 32px);min-height:60px}
+.cmt::placeholder{color:var(--dim)}
+.cmt:focus{border-color:var(--acc);outline:none}
+
+/* History dates */
+.hdt{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;margin:8px 16px 0;background:var(--card);border-radius:var(--rs);border:1px solid var(--bdr);cursor:pointer;font-size:15px;font-weight:600}
+.hdt svg{transition:transform .2s}
+.hdt.open svg{transform:rotate(180deg)}
+.hdtl{margin:0 16px;background:var(--card);border:1px solid var(--bdr);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:0 12px 12px}
+.hset{display:flex;justify-content:space-between;padding:6px 4px;font-size:13px;border-top:1px solid var(--bdr)}
+.hcmt{font-size:12px;color:var(--txt3);font-style:italic;padding:8px 4px 0}
+
+/* Modal */
+.mov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.mod{background:var(--card);border-radius:20px 20px 0 0;max-width:430px;width:100%;max-height:70vh;overflow-y:auto;padding:20px 16px max(env(safe-area-inset-bottom),20px)}
+.mha{width:36px;height:4px;border-radius:2px;background:var(--bdr2);margin:0 auto 16px}
+.mti{font-size:18px;font-weight:800;margin-bottom:16px}
+.mit{padding:12px 14px;border-radius:var(--rs);margin-bottom:6px;background:var(--card2);border:1px solid var(--bdr);font-size:14px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.mit:active{background:var(--accbg)}
+.mit .cat{font-size:11px;color:var(--txt3);font-weight:500}
+.minp{width:100%;padding:12px 14px;border-radius:var(--rs);border:1px solid var(--bdr);background:var(--card);font-size:14px;color:var(--txt);margin-bottom:8px}
+.minp:focus{border-color:var(--acc);outline:none}
+.mbtn{padding:12px;border-radius:var(--rs);background:var(--acc);color:#fff;font-size:14px;font-weight:700;width:100%;text-align:center;cursor:pointer}
+
+/* Bank */
+.bcard{background:var(--card);margin:0 16px 8px;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);cursor:pointer}
+.bcard:active{background:var(--card2)}
+
+/* Editor */
+.edex{background:var(--card2);border-radius:var(--rs);padding:12px;margin-bottom:8px;border:1px solid var(--bdr)}
+.edinp{padding:8px 10px;border-radius:var(--rx);border:1px solid var(--bdr);background:var(--card);color:var(--txt);font-size:13px;font-weight:600}
+.edinp:focus{border-color:var(--acc);outline:none}
+.edsel{padding:8px;border-radius:var(--rx);border:1px solid var(--bdr);background:var(--card);color:var(--txt2);font-size:12px}
+.eddel{width:30px;height:30px;border-radius:50%;background:#fee;color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;cursor:pointer}
+.edmv{width:24px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer}
+.edmv.on{background:var(--card);border:1px solid var(--bdr);color:var(--txt2)}
+.edmv.off{background:transparent;border:1px solid transparent;color:var(--dim)}
+.btna{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border-radius:var(--rs);border:1.5px dashed var(--bdr2);color:var(--txt3);font-size:13px;font-weight:600;cursor:pointer;margin-top:8px}
+.btna:active{background:var(--accbg)}
+.btnacc{padding:12px 20px;border-radius:var(--rs);background:var(--acc);color:#fff;font-size:14px;font-weight:700;text-align:center;width:100%;cursor:pointer;margin-top:8px}
+
+/* Stat */
+.stbox{background:var(--card);border-radius:var(--r);padding:16px;margin:0 16px 12px;box-shadow:var(--shadow)}
+.stl{font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.stv{font-size:28px;font-weight:900}
+
+/* Backup */
+.bkc{background:var(--card);border-radius:16px;padding:20px;border:1px solid var(--bdr);margin:16px}
+.bkb{display:flex;gap:10px;margin-top:16px}
+.bkn{flex:1;padding:14px;border-radius:12px;border:none;font-size:14px;font-weight:700;cursor:pointer;text-align:center}
+.bke{background:var(--acc);color:#fff}
+.bki{background:rgba(104,211,145,.15);color:var(--green);border:1px solid var(--greenbdr)}
+
+/* Dropdown */
+.ddo{position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.3)}
+.dd{position:fixed;top:60px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:400px;background:var(--card);border-radius:var(--r);box-shadow:var(--shadow2);z-index:151;overflow:hidden}
+.ddi{padding:14px 16px;border-bottom:1px solid var(--bdr);font-size:14px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.ddi:last-child{border-bottom:none}
+.ddi:active{background:var(--bg)}
+
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.mod{animation:slideUp .25s ease-out}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.mov{animation:fadeIn .15s ease-out}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hdr">
+    <button class="cyc-btn" id="cyc-btn" onclick="W.toggleDrop()">
+      <span id="cyc-name"></span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+    </button>
+  </div>
+  <div class="cnt" id="cnt"></div>
+  <div class="nav" id="nav">
+    <button class="nb on" data-v="cal" onclick="W.go('cal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="nl">Calendar</span></button>
+    <button class="nb" data-v="wk" onclick="W.go('wk')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 17.5h11M2 10h4v4H2zM18 10h4v4h-4zM6 7v10M18 7v10"/></svg><span class="nl">Workout</span></button>
+    <button class="nb" data-v="bank" onclick="W.go('bank')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg><span class="nl">Exercises</span></button>
+    <button class="nb" data-v="ed" onclick="W.go('ed')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span class="nl">Program</span></button>
+    <button class="nb" data-v="st" onclick="W.go('st')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span class="nl">Stats</span></button>
+  </div>
+</div>
+<div id="drop-ov" class="ddo hidden" onclick="W.toggleDrop()"></div>
+<div id="drop" class="dd hidden"></div>
+<div id="modal"></div>
+<input type="file" id="imp" accept=".json" style="display:none">
+<script>
+// ═══════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════
+var W = {};
+var D, ST = {
+  view: "cal",
+  sub: null,     // sub-page: "day","exd","edcyc","edday","bankd"
+  sd: {},        // sub-page data
+  calY: new Date().getFullYear(),
+  calM: new Date().getMonth(),
+  calSel: null,
+  wkDate: null,  // current workout date
+  histOpen: {},
+};
+var SK = "lift-v5";
+
+// ═══════════════════════════════════════
+// UTIL
+// ═══════════════════════════════════════
+function $(id) { return document.getElementById(id); }
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function esc(s) { var t = String(s == null ? "" : s); return t.replace(/&/g, "&amp;").replace(/\x3c/g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+function b64e(s) { try { return btoa(encodeURIComponent(s || "")); } catch (e) { return ""; } }
+function b64d(s) { try { return decodeURIComponent(atob(s)); } catch (e) { return ""; } }
+function ds(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function today() { return ds(new Date()); }
+function fmt(s) { if (!s) return ""; var d = new Date(s + "T00:00:00"); return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
+function lk(cid, dt, ei, si) { return cid + "__" + dt + "__e" + ei + "__s" + si; }
+function load() { try { return JSON.parse(localStorage.getItem(SK)); } catch (e) { return null; } }
+function save() { try { localStorage.setItem(SK, JSON.stringify(D)); } catch (e) { console.error(e); } }
+function cy() { return D.cycles.find(function (c) { return c.id === D.aid; }) || D.cycles[0]; }
+function phFor(w) { var c = cy(); for (var i = 0; i < c.phases.length; i++) { if (c.phases[i].weeks.indexOf(w) >= 0) return c.phases[i]; } return null; }
+
+// ═══════════════════════════════════════
+// DATA ACCESS
+// ═══════════════════════════════════════
+function dayFor(dt) {
+  var c = cy();
+  if (!c || !D.starts[c.id]) return null;
+  var start = new Date(D.starts[c.id] + "T00:00:00");
+  var d = new Date(dt + "T00:00:00");
+  var diff = Math.floor((d - start) / 864e5);
+  if (diff < 0) return null;
+  var wk = Math.floor(diff / 7) + 1;
+  if (wk > c.totalWeeks) return null;
+  var dow = d.getDay();
+  var dk = D.dayMap[dow];
+  if (!dk) return null;
+  var wd = c.weeks[wk];
+  if (!wd || !wd[dk]) return null;
+  return { week: wk, dayKey: dk, day: wd[dk] };
+}
+
+function exsFor(dt) {
+  var info = dayFor(dt);
+  if (!info) return null;
+  var c = cy();
+  var ov = (D.ov[c.id] || {})[dt] || {};
+  var exs = info.day.exercises.map(function (ex, i) {
+    if (ov[i]) return Object.assign({}, ex, ov[i]);
+    return Object.assign({}, ex);
+  });
+  return { week: info.week, dayKey: info.dayKey, day: info.day, exercises: exs };
+}
+
+function isDone(dt) { return (D.done[cy().id] || {})[dt] === true; }
+
+function getBank() { return D.bank || []; }
+function addBank(name, cat) {
+  if (!D.bank) D.bank = [];
+  var exists = D.bank.some(function (b) { return b.name.toLowerCase() === name.toLowerCase(); });
+  if (!exists) { D.bank.push({ id: uid(), name: name, category: cat || "custom" }); save(); }
+}
+
+function getHist(name) {
+  var c = cy(), res = [];
+  var keys = Object.keys(D.logs || {});
+  for (var k = 0; k < keys.length; k++) {
+    var key = keys[k];
+    if (key.indexOf(c.id) !== 0) continue;
+    var v = D.logs[key];
+    var ps = key.split("__");
+    var dt = ps[1], ei = parseInt(ps[2].replace("e", "")), si = parseInt(ps[3].replace("s", ""));
+    var info = exsFor(dt);
+    if (!info || !info.exercises[ei]) continue;
+    if (info.exercises[ei].n === name && v.w && v.r) {
+      res.push({ date: dt, si: si, weight: parseFloat(v.w), reps: parseInt(v.r), rpe: v.rpe || "" });
+    }
+  }
+  res.sort(function (a, b) { return a.date > b.date ? -1 : a.date < b.date ? 1 : a.si - b.si; });
+  return res;
+}
+
+function getPR(name) {
+  var h = getHist(name);
+  if (!h.length) return 0;
+  var mx = 0;
+  for (var i = 0; i < h.length; i++) { if (h[i].weight > mx) mx = h[i].weight; }
+  return mx;
+}
+
+function allNames() {
+  var c = cy(), s = {};
+  var wks = Object.keys(c.weeks);
+  for (var w = 0; w < wks.length; w++) {
+    var days = Object.keys(c.weeks[wks[w]]);
+    for (var d = 0; d < days.length; d++) {
+      var exs = c.weeks[wks[w]][days[d]].exercises;
+      for (var e = 0; e < exs.length; e++) s[exs[e].n] = 1;
+    }
+  }
+  var bank = D.bank || [];
+  for (var i = 0; i < bank.length; i++) s[bank[i].name] = 1;
+  return Object.keys(s).sort();
+}
+
+// ═══════════════════════════════════════
+// DEFAULT PROGRAM
+// ═══════════════════════════════════════
+function mkProg() {
+  var phases = [
+    { id: "p1", name: "Phase 1: Hypertrophy", weeks: [1, 2, 3, 4], color: "#c45a3c" },
+    { id: "p2", name: "Phase 2: Strength & Power", weeks: [5, 6, 7, 8], color: "#d4715a" },
+    { id: "p3", name: "Phase 3: Peak & Test", weeks: [9, 10, 11, 12], color: "#3a8a5c" }
+  ];
+  var dl = { "Day 1": "Lower Strength", "Day 2": "Upper Push", "Day 3": "Lower Power + Posterior", "Day 4": "Upper Pull + Arms" };
+  var base = {
+    "Day 1": [
+      { n: "Jog", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "2 min", rpe: "—" }] },
+      { n: "DB Windmill Press", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "8 each", rpe: "3" }, { r: "8 each", rpe: "3" }, { r: "8 each", rpe: "3" }] },
+      { n: "Banded Face Pull", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "15", rpe: "3" }, { r: "15", rpe: "3" }, { r: "15", rpe: "3" }] },
+      { n: "Back Squat", t: "compound", tp: "Normal", cat: "primary", s: [{ r: "8", rpe: "6" }, { r: "8", rpe: "6.5" }, { r: "8", rpe: "7" }, { r: "6-8", rpe: "7" }], rest: "180s" },
+      { n: "Zercher Squat", t: "compound", tp: "Controlled", cat: "primary", s: [{ r: "8", rpe: "6.5" }, { r: "8", rpe: "7" }, { r: "6-8", rpe: "7" }], rest: "150s" },
+      { n: "DB Romanian Deadlift", t: "accessory", tp: "3-1-1", cat: "strength_balance", s: [{ r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }], rest: "90s" },
+      { n: "DB Bulgarian Split Squat", t: "accessory", tp: "Normal", cat: "strength_balance", s: [{ r: "10-12/leg", rpe: "7" }, { r: "10-12/leg", rpe: "7" }, { r: "10-12/leg", rpe: "7" }], rest: "90s" },
+      { n: "Box Jumps", t: "plyo", tp: "Explosive", cat: "plyometric", s: [{ r: "5", rpe: "—" }, { r: "5", rpe: "—" }, { r: "5", rpe: "—" }], rest: "120s" },
+      { n: "90/90 Hip Stretch + Cat/Cow", t: "mobility", tp: "—", cat: "cooldown", s: [{ r: "60s each", rpe: "—" }, { r: "60s each", rpe: "—" }] }
+    ],
+    "Day 2": [
+      { n: "Jog", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "2 min", rpe: "—" }] },
+      { n: "DB Windmill Press", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "8 each", rpe: "3" }, { r: "8 each", rpe: "3" }, { r: "8 each", rpe: "3" }] },
+      { n: "Banded Face Pull", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "15", rpe: "3" }, { r: "15", rpe: "3" }, { r: "15", rpe: "3" }] },
+      { n: "Flat Barbell Bench Press", t: "compound", tp: "Normal", cat: "primary", s: [{ r: "8", rpe: "6" }, { r: "8", rpe: "6.5" }, { r: "8", rpe: "7" }, { r: "6-8", rpe: "7" }], rest: "180s" },
+      { n: "Incline DB Bench Press", t: "compound", tp: "Normal", cat: "primary", s: [{ r: "10", rpe: "6.5" }, { r: "10", rpe: "7" }, { r: "8-10", rpe: "7" }], rest: "150s" },
+      { n: "DB Overhead Press (Seated)", t: "accessory", tp: "Normal", cat: "strength_balance", s: [{ r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }], rest: "90s" },
+      { n: "Cable Flyes", t: "accessory", tp: "Squeeze at top", cat: "strength_balance", s: [{ r: "12-15", rpe: "7" }, { r: "12-15", rpe: "7" }, { r: "12-15", rpe: "7" }], rest: "60s" },
+      { n: "Plyo Push-Ups", t: "plyo", tp: "Explosive", cat: "plyometric", s: [{ r: "6", rpe: "—" }, { r: "6", rpe: "—" }, { r: "6", rpe: "—" }], rest: "120s" },
+      { n: "Banded Pull-Aparts + Shoulder CARs", t: "mobility", tp: "—", cat: "cooldown", s: [{ r: "15 each", rpe: "—" }, { r: "15 each", rpe: "—" }] }
+    ],
+    "Day 3": [
+      { n: "Jog", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "2 min", rpe: "—" }] },
+      { n: "Goblet Curtsy Squat", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "8 each", rpe: "3" }, { r: "8 each", rpe: "3" }, { r: "8 each", rpe: "3" }] },
+      { n: "Cardio Sprint", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "30s", rpe: "6" }, { r: "30s", rpe: "6" }, { r: "30s", rpe: "6" }] },
+      { n: "Sumo Deadlift", t: "compound", tp: "Normal", cat: "primary", s: [{ r: "8", rpe: "6" }, { r: "8", rpe: "6.5" }, { r: "8", rpe: "7" }, { r: "6-8", rpe: "7" }], rest: "180s" },
+      { n: "Front Squat", t: "compound", tp: "Normal", cat: "primary", s: [{ r: "8", rpe: "6.5" }, { r: "8", rpe: "7" }, { r: "6-8", rpe: "7" }], rest: "150s" },
+      { n: "Barbell Hip Thrust", t: "accessory", tp: "Pause 1s top", cat: "strength_balance", s: [{ r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }], rest: "90s" },
+      { n: "Single-Leg DB RDL", t: "accessory", tp: "3-1-1", cat: "strength_balance", s: [{ r: "10-12/leg", rpe: "7" }, { r: "10-12/leg", rpe: "7" }, { r: "10-12/leg", rpe: "7" }], rest: "90s" },
+      { n: "Broad Jumps", t: "plyo", tp: "Explosive", cat: "plyometric", s: [{ r: "5", rpe: "—" }, { r: "5", rpe: "—" }, { r: "5", rpe: "—" }], rest: "120s" },
+      { n: "Pigeon Stretch + Ankle Mobility", t: "mobility", tp: "—", cat: "cooldown", s: [{ r: "60s each", rpe: "—" }, { r: "60s each", rpe: "—" }] }
+    ],
+    "Day 4": [
+      { n: "Jog", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "2 min", rpe: "—" }] },
+      { n: "DB Windmill Press", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "8 each", rpe: "3" }, { r: "8 each", rpe: "3" }, { r: "8 each", rpe: "3" }] },
+      { n: "Banded Face Pull", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "15", rpe: "3" }, { r: "15", rpe: "3" }, { r: "15", rpe: "3" }] },
+      { n: "Weighted Pull-Ups", t: "compound", tp: "Normal", cat: "primary", s: [{ r: "8", rpe: "6" }, { r: "8", rpe: "6.5" }, { r: "8", rpe: "7" }, { r: "6-8", rpe: "7" }], rest: "180s" },
+      { n: "DB Single-Arm Row", t: "compound", tp: "Normal", cat: "primary", s: [{ r: "10", rpe: "6.5" }, { r: "10", rpe: "7" }, { r: "8-10", rpe: "7" }], rest: "150s" },
+      { n: "Cable Face Pulls", t: "accessory", tp: "Squeeze", cat: "strength_balance", s: [{ r: "15-20", rpe: "6" }, { r: "15-20", rpe: "6" }, { r: "15-20", rpe: "6" }], rest: "60s" },
+      { n: "DB Hammer Curls", t: "accessory", tp: "Normal", cat: "finisher", s: [{ r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }], rest: "60s" },
+      { n: "Tricep Dips / Cable Pushdowns", t: "accessory", tp: "Normal", cat: "finisher", s: [{ r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }, { r: "10-12", rpe: "7" }], rest: "60s" },
+      { n: "Dead Hangs + T-Spine Openers", t: "mobility", tp: "—", cat: "cooldown", s: [{ r: "30-45s", rpe: "—" }, { r: "30-45s", rpe: "—" }] }
+    ]
+  };
+
+  var weeks = {};
+  for (var w = 1; w <= 12; w++) {
+    var days = {};
+    var dks = ["Day 1", "Day 2", "Day 3", "Day 4"];
+    for (var di = 0; di < dks.length; di++) {
+      var dk = dks[di];
+      var isDl = w === 4 || w === 8, isTst = w === 12;
+      var label = dk + " \u2014 " + dl[dk];
+      if (isDl) label += " (DELOAD)";
+      if (isTst) label += " (TEST)";
+      var exercises = base[dk].map(function (ex) {
+        return {
+          n: ex.n, t: ex.t, tp: ex.tp, cat: ex.cat, rest: ex.rest,
+          s: ex.s.map(function (ss) {
+            var rpe = ss.rpe;
+            if (rpe !== "—" && rpe !== "3") {
+              var b = parseFloat(rpe) || 7, a;
+              if (isDl) a = Math.max(5, b - 1.5);
+              else if (isTst) a = Math.min(10, b + 2.5);
+              else if (w <= 4) a = b + (w - 1) * 0.33;
+              else if (w <= 8) a = b + 0.5 + (w - 5) * 0.33;
+              else a = b + 1 + (w - 9) * 0.33;
+              rpe = String(Math.min(10, Math.round(a * 2) / 2));
+            }
+            var r = ss.r;
+            if (ex.t === "compound" && rpe !== "—" && rpe !== "3") {
+              if (w >= 9 && w !== 12) r = r.replace(/\d+/g, function (x) { return Math.max(2, parseInt(x) - 3); });
+              else if (w >= 5 && w <= 8) r = r.replace(/\d+/g, function (x) { return Math.max(3, parseInt(x) - 2); });
+            }
+            return { r: r, rpe: rpe };
+          })
+        };
+      });
+      days[dk] = { label: label, exercises: exercises };
+    }
+    weeks[w] = days;
+  }
+
+  // Build bank
+  var bank = [], seen = {};
+  var bkeys = Object.keys(base);
+  for (var bi = 0; bi < bkeys.length; bi++) {
+    var dayExs = base[bkeys[bi]];
+    for (var be = 0; be < dayExs.length; be++) {
+      if (!seen[dayExs[be].n]) {
+        seen[dayExs[be].n] = 1;
+        bank.push({ id: uid(), name: dayExs[be].n, category: dayExs[be].cat || "custom" });
+      }
+    }
+  }
+
+  return {
+    prog: { id: "cycle-1", name: "12-Week Functional Strength", phases: phases, weeks: weeks, totalWeeks: 12, daysPerWeek: 4 },
+    bank: bank
+  };
+}
+
+function initData() {
+  var built = mkProg();
+  return {
+    cycles: [built.prog], aid: "cycle-1", starts: {}, logs: {},
+    dayMap: { 0: null, 1: "Day 1", 2: "Day 2", 3: null, 4: "Day 3", 5: "Day 4", 6: null },
+    done: {}, ov: {}, bank: built.bank, cmt: {}
+  };
+}
+
+// ═══════════════════════════════════════
+// SVG helpers
+// ═══════════════════════════════════════
+var SVG = {
+  chk: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg>',
+  left: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>',
+  right: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,6 15,12 9,18"/></svg>',
+  swap: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>',
+  down: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg>',
+  bkleft: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>'
+};
+
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+W.go = function (v) {
+  ST.view = v;
+  // Clear sub-page state when switching tabs (except preserve wkDate)
+  ST.sub = null;
+  ST.sd = {};
+  document.querySelectorAll(".nb").forEach(function (b) { b.classList.toggle("on", b.dataset.v === v); });
+  $("nav").classList.remove("hidden");
+  render();
+};
+
+W.goSub = function (sub, data) { ST.sub = sub; ST.sd = data || {}; render(); };
+W.goBack = function () {
+  if (ST.sub === "exd") {
+    // If we came from workout tab, just clear sub and re-render workout
+    if (ST.view === "wk") { ST.sub = null; ST.sd = {}; render(); return; }
+    // Otherwise go back to day sub-page
+    ST.sub = "day"; ST.sd = { date: ST.sd.date }; render(); return;
+  }
+  if (ST.sub === "edday") { W.goSub("edcyc", { cid: ST.sd.cid }); return; }
+  if (ST.sub === "bankd") { ST.sub = null; ST.sd = {}; render(); return; }
+  if (ST.sub === "edcyc") { ST.sub = null; ST.sd = {}; render(); return; }
+  if (ST.sub === "day") {
+    ST.sub = null; ST.sd = {}; render(); return;
+  }
+  ST.sub = null; ST.sd = {}; render();
+};
+
+W.loadWorkout = function (dt) { ST.wkDate = dt; W.go("wk"); };
+
+// ═══════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════
+function render() {
+  $("cyc-name").textContent = cy().name;
+  var el = $("cnt");
+
+  // Hide nav for editor sub-pages only
+  var hideNav = ST.sub === "edcyc" || ST.sub === "edday";
+  $("nav").classList.toggle("hidden", hideNav);
+
+  if (ST.sub) {
+    switch (ST.sub) {
+      case "day": el.innerHTML = rDay(); break;
+      case "exd": el.innerHTML = rExDetail(); break;
+      case "edcyc": el.innerHTML = rEdCycle(); break;
+      case "edday": el.innerHTML = rEdDay(); break;
+      case "bankd": el.innerHTML = rBankDetail(); break;
+      default: el.innerHTML = "";
+    }
+    return;
+  }
+
+  switch (ST.view) {
+    case "cal": el.innerHTML = rCal(); break;
+    case "wk": el.innerHTML = rWorkout(); break;
+    case "bank": el.innerHTML = rBank(); break;
+    case "ed": el.innerHTML = rEditor(); break;
+    case "st": el.innerHTML = rStats(); break;
+  }
+}
+
+// ═══════════════════════════════════════
+// CALENDAR
+// ═══════════════════════════════════════
+function rCal() {
+  var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  var first = new Date(ST.calY, ST.calM, 1);
+  var last = new Date(ST.calY, ST.calM + 1, 0);
+  var startDow = first.getDay(), dim = last.getDate(), td = today();
+
+  var h = '<div class="cal-h"><div class="cal-m">' + months[ST.calM] + " " + ST.calY + '</div><div class="cal-n">';
+  h += '<button onclick="W.calPrev()">' + SVG.left + '</button><button onclick="W.calNext()">' + SVG.right + '</button></div></div>';
+  h += '<div class="cal-g">';
+  var dw = ["S", "M", "T", "W", "T", "F", "S"];
+  for (var i = 0; i < 7; i++) h += '<div class="cal-dw">' + dw[i] + '</div>';
+
+  var prev = new Date(ST.calY, ST.calM, 0);
+  for (var p = startDow - 1; p >= 0; p--) h += '<div class="cal-d om">' + (prev.getDate() - p) + '</div>';
+
+  for (var d = 1; d <= dim; d++) {
+    var dt = ST.calY + "-" + String(ST.calM + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    var isT = dt === td, hasW = !!dayFor(dt), dn = isDone(dt), isSel = dt === ST.calSel && !isT;
+    var cls = "cal-d";
+    if (isT) cls += " today";
+    if (hasW) cls += " has-wk";
+    if (dn) cls += " done";
+    if (isSel) cls += " sel";
+    h += '<div class="' + cls + '" data-dt="' + dt + '">' + d + '</div>';
+  }
+
+  var total = startDow + dim, rem = 7 - (total % 7);
+  if (rem < 7) for (var r = 1; r <= rem; r++) h += '<div class="cal-d om">' + r + '</div>';
+  h += '</div>';
+
+  if (ST.calSel) {
+    var info = exsFor(ST.calSel);
+    if (info) {
+      var dc = isDone(ST.calSel);
+      h += '<div style="padding:8px 16px"><div style="font-size:14px;font-weight:700;margin-bottom:4px">' + fmt(ST.calSel) + '</div>';
+      h += '<div style="font-size:13px;color:var(--txt2);margin-bottom:12px">Week ' + info.week + ' \u2014 ' + esc(info.day.label) + (dc ? ' <span style="color:var(--green);font-weight:700">\u2713 Complete</span>' : '') + '</div>';
+      h += '<button class="btnacc" data-dt="' + ST.calSel + '" data-act="loadwk">View Workout</button></div>';
+    } else {
+      h += '<div style="padding:16px;text-align:center;color:var(--txt3);font-size:14px">No workout scheduled for ' + fmt(ST.calSel) + '</div>';
+    }
+  }
+  return h;
+}
+
+W.calPrev = function () { ST.calM--; if (ST.calM < 0) { ST.calM = 11; ST.calY--; } ST.calSel = null; render(); };
+W.calNext = function () { ST.calM++; if (ST.calM > 11) { ST.calM = 0; ST.calY++; } ST.calSel = null; render(); };
+
+// ═══════════════════════════════════════
+// WORKOUT TAB
+// ═══════════════════════════════════════
+function rWorkout() {
+  if (!D.starts[cy().id]) {
+    return '<div style="padding:40px 20px;text-align:center"><div style="font-size:48px;margin-bottom:16px">\u2699\ufe0f</div><div style="font-size:20px;font-weight:800;margin-bottom:8px">Setup Required</div><div style="font-size:14px;color:var(--txt3);line-height:1.6">Go to the <b>Program</b> tab to set your cycle start date and training days, then come back here.</div></div>';
+  }
+  if (!ST.wkDate) return '<div style="padding:40px 20px;text-align:center"><div style="font-size:48px;margin-bottom:16px">\ud83d\udccb</div><div style="font-size:20px;font-weight:800;margin-bottom:8px">No Workout Selected</div><div style="font-size:14px;color:var(--txt3);line-height:1.6">Tap a date on the <b>Calendar</b> tab to load a workout here.</div></div>';
+  var info = exsFor(ST.wkDate);
+  if (!info) return '<div style="padding:40px 20px;text-align:center"><div style="font-size:48px;margin-bottom:16px">\ud83c\udfaf</div><div style="font-size:20px;font-weight:800;margin-bottom:8px">Rest Day</div><div style="font-size:14px;color:var(--txt3)">No workout for ' + fmt(ST.wkDate) + '.</div></div>';
+  // Render day content inline — do NOT set ST.sub here
+  var savedSub = ST.sub, savedSd = ST.sd;
+  ST.sd = { date: ST.wkDate };
+  var html = rDay();
+  ST.sub = savedSub; ST.sd = savedSd;
+  return html;
+}
+
+// ═══════════════════════════════════════
+// DAY PAGE
+// ═══════════════════════════════════════
+function rDay() {
+  var dt = ST.sd.date;
+  var info = exsFor(dt);
+  if (!info) return '<div style="padding:20px;text-align:center;color:var(--txt3)">No workout.</div>';
+  var dc = isDone(dt), ph = phFor(info.week);
+
+  var h = '<div class="dh"><button class="dh-bk" data-act="dayback">' + SVG.bkleft + '</button>';
+  h += '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:' + (ph ? ph.color : "var(--acc)") + ';text-transform:uppercase;letter-spacing:1px">Week ' + info.week + ' \u2022 ' + fmt(dt) + '</div>';
+  h += '<div class="dh-t">' + esc(info.day.label) + '</div></div></div>';
+
+  var catLabels = { warmup: "WARMUP", primary: "PRIMARY LIFTS", strength_balance: "STRENGTH BALANCE", finisher: "FINISHER", plyometric: "PLYOMETRIC", cooldown: "COOLDOWN" };
+  var curCat = "";
+  var c = cy();
+
+  for (var i = 0; i < info.exercises.length; i++) {
+    var ex = info.exercises[i];
+    var cat = ex.cat || "primary";
+    if (cat !== curCat) { curCat = cat; h += '<div class="sec">' + (catLabels[cat] || cat.toUpperCase()) + '</div>'; }
+    var sc = ex.s.length, lc = 0;
+    for (var si = 0; si < sc; si++) { var lg = D.logs[lk(c.id, dt, i, si)]; if (lg && lg.done) lc++; }
+    var ad = lc === sc && sc > 0;
+
+    h += '<div class="exr" data-act="goex" data-dt="' + dt + '" data-i="' + i + '">';
+    h += '<div class="exr-dn' + (ad ? " ck" : "") + '">' + (ad ? SVG.chk : "") + '</div>';
+    h += '<div class="exr-i"><div class="exr-n">' + esc(ex.n) + '</div>';
+    h += '<div class="exr-m">' + sc + ' sets' + (ex.rest ? ' \u2022 Rest ' + esc(ex.rest) : '') + '</div></div>';
+    h += '<button class="exr-sw" data-act="swap" data-dt="' + dt + '" data-i="' + i + '">' + SVG.swap + '</button></div>';
+  }
+
+  h += '<button class="btn-cmp' + (dc ? " dn" : "") + '" data-act="toggleday" data-dt="' + dt + '">' + (dc ? "\u2713 Workout Complete" : "Mark Day Complete") + '</button>';
+  return h;
+}
+
+// ═══════════════════════════════════════
+// EXERCISE DETAIL
+// ═══════════════════════════════════════
+function rExDetail() {
+  var dt = ST.sd.date, ei = ST.sd.ei;
+  var info = exsFor(dt);
+  if (!info || !info.exercises[ei]) return "Error";
+  var ex = info.exercises[ei], c = cy();
+
+  var h = '<div class="dh"><button class="dh-bk" data-act="exback">' + SVG.bkleft + '</button>';
+  h += '<div class="dh-t">' + esc(ex.n) + '</div></div>';
+
+  // Guidelines
+  var gl = [];
+  if (ex.tp && ex.tp !== "—" && ex.tp !== "Normal") gl.push("Tempo: " + ex.tp);
+  if (ex.rest) gl.push("Rest: " + ex.rest + " between sets");
+  if (ex.cat) gl.push("Category: " + ex.cat.replace(/_/g, " "));
+  if (gl.length) {
+    h += '<div class="gbox"><div class="gbox-l">Guidelines</div><div class="gbox-t">' + gl.map(esc).join("<br>") + '</div></div>';
+  }
+
+  h += '<div style="padding:8px 16px;font-size:16px;font-weight:700">' + fmt(dt) + '</div>';
+  h += '<div class="sh"><div>SET</div><div style="text-align:center">TARGET</div><div style="text-align:center">LBS</div><div style="text-align:center">REPS</div><div></div></div>';
+
+  var sets = ex.s;
+  var extraKey = c.id + "__" + dt + "__extra__" + ei;
+  var extras = (D.logs[extraKey] || {}).count || 0;
+  var total = sets.length + extras;
+
+  for (var si = 0; si < total; si++) {
+    var k = lk(c.id, dt, ei, si);
+    var lg = D.logs[k] || {};
+    var dn = !!lg.done;
+    var tgt = si < sets.length ? sets[si] : null;
+    var isW = tgt && tgt.rpe === "3";
+
+    h += '<div class="srow">';
+    h += '<div class="snum' + (isW ? " w" : "") + '">' + (isW ? "W" : (si + 1)) + '</div>';
+    if (tgt) {
+      h += '<div class="star"><b>' + esc(tgt.r) + '</b>' + (tgt.rpe !== "—" ? '<br><span style="font-size:11px;color:var(--txt3)">RPE ' + esc(tgt.rpe) + '</span>' : '') + '</div>';
+    } else {
+      h += '<div class="star" style="font-size:11px;color:var(--dim)">Extra</div>';
+    }
+    h += '<input type="number" inputmode="decimal" placeholder="\u2014" class="sinp" value="' + esc(lg.w || "") + '" data-act="logw" data-k="' + esc(k) + '">';
+    h += '<input type="number" inputmode="numeric" placeholder="\u2014" class="sinp" value="' + esc(lg.r || "") + '" data-act="logr" data-k="' + esc(k) + '">';
+    h += '<button class="schk' + (dn ? " dn" : "") + '" data-act="schk" data-k="' + esc(k) + '">' + (dn ? SVG.chk : "") + '</button>';
+    h += '</div>';
+  }
+
+  h += '<button class="aset" data-act="addset" data-dt="' + dt + '" data-ei="' + ei + '">+ ADD SET</button>';
+
+  // Comments
+  var ck = c.id + "__" + dt + "__cmt__" + ei;
+  var comment = (D.cmt || {})[ck] || "";
+  h += '<textarea class="cmt" placeholder="Comments..." data-act="cmt" data-ck="' + esc(ck) + '">' + esc(comment) + '</textarea>';
+
+  // History
+  var hist = getHist(ex.n);
+  var histForOther = [];
+  for (var hi = 0; hi < hist.length; hi++) { if (hist[hi].date !== dt) histForOther.push(hist[hi]); }
+  var histDates = [], hdSeen = {};
+  for (var hi2 = 0; hi2 < histForOther.length; hi2++) {
+    if (!hdSeen[histForOther[hi2].date]) { hdSeen[histForOther[hi2].date] = 1; histDates.push(histForOther[hi2].date); }
+  }
+
+  if (histDates.length) {
+    h += '<div class="sec">Previous Performance</div>';
+    for (var hd = 0; hd < histDates.length; hd++) {
+      var hdt = histDates[hd];
+      var isOpen = ST.histOpen[hdt];
+      h += '<div class="hdt' + (isOpen ? " open" : "") + '" data-act="thist" data-hd="' + hdt + '"><span>' + fmt(hdt) + '</span>' + SVG.down + '</div>';
+      if (isOpen) {
+        h += '<div class="hdtl">';
+        for (var he = 0; he < histForOther.length; he++) {
+          if (histForOther[he].date === hdt) {
+            var e = histForOther[he];
+            h += '<div class="hset"><span style="color:var(--txt3)">Set ' + (e.si + 1) + '</span><span style="font-weight:700">' + e.weight + ' lbs \u00d7 ' + e.reps + '</span></div>';
+          }
+        }
+        // Comment for that date
+        var hck = c.id + "__" + hdt + "__cmt__" + ei;
+        var hc = (D.cmt || {})[hck];
+        if (hc) h += '<div class="hcmt">\u201c' + esc(hc) + '\u201d</div>';
+        h += '</div>';
+      }
+    }
+  }
+  return h;
+}
+
+// ═══════════════════════════════════════
+// EXERCISE BANK
+// ═══════════════════════════════════════
+function rBank() {
+  var bank = getBank();
+  var cats = [], cSeen = {};
+  for (var i = 0; i < bank.length; i++) { if (!cSeen[bank[i].category]) { cSeen[bank[i].category] = 1; cats.push(bank[i].category); } }
+  cats.sort();
+
+  var h = '<div style="padding:16px 16px 8px;display:flex;justify-content:space-between;align-items:center"><div style="font-size:22px;font-weight:800">Exercise Bank</div>';
+  h += '<button style="padding:8px 14px;border-radius:var(--rx);background:var(--acc);color:#fff;font-size:13px;font-weight:600" data-act="addbank">+ Add</button></div>';
+
+  for (var ci = 0; ci < cats.length; ci++) {
+    var cat = cats[ci];
+    h += '<div class="sec">' + esc(cat.replace(/_/g, " ")) + '</div>';
+    for (var bi = 0; bi < bank.length; bi++) {
+      if (bank[bi].category !== cat) continue;
+      var pr = getPR(bank[bi].name);
+      h += '<div class="bcard" data-act="gobankd" data-bn="' + b64e(bank[bi].name) + '"><div style="display:flex;justify-content:space-between;align-items:center">';
+      h += '<div><div style="font-size:15px;font-weight:700">' + esc(bank[bi].name) + '</div><div style="font-size:12px;color:var(--txt3)">' + esc(cat.replace(/_/g, " ")) + '</div></div>';
+      if (pr) h += '<div style="font-size:14px;font-weight:800;color:var(--acc)">PR: ' + pr + ' lbs</div>';
+      h += '</div></div>';
+    }
+  }
+  return h;
+}
+
+function rBankDetail() {
+  var name = ST.sd.name;
+  var hist = getHist(name);
+  var pr = getPR(name);
+  var histDates = [], hdSeen = {};
+  for (var i = 0; i < hist.length; i++) { if (!hdSeen[hist[i].date]) { hdSeen[hist[i].date] = 1; histDates.push(hist[i].date); } }
+
+  var h = '<div class="dh"><button class="dh-bk" data-act="back">' + SVG.bkleft + '</button><div class="dh-t">' + esc(name) + '</div></div>';
+  if (pr) {
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 16px">';
+    h += '<div class="stbox" style="margin:0"><div class="stl">Personal Record</div><div class="stv" style="color:var(--acc)">' + pr + ' <span style="font-size:14px;color:var(--txt3)">lbs</span></div></div>';
+    h += '<div class="stbox" style="margin:0"><div class="stl">Total Sessions</div><div class="stv">' + histDates.length + '</div></div></div>';
+  }
+  h += '<div class="sec">Performance History</div>';
+  for (var d = 0; d < histDates.length; d++) {
+    var hdt = histDates[d], isOpen = ST.histOpen[hdt];
+    h += '<div class="hdt' + (isOpen ? " open" : "") + '" data-act="thist" data-hd="' + hdt + '"><span>' + fmt(hdt) + '</span>' + SVG.down + '</div>';
+    if (isOpen) {
+      h += '<div class="hdtl">';
+      for (var he = 0; he < hist.length; he++) {
+        if (hist[he].date === hdt) h += '<div class="hset"><span style="color:var(--txt3)">Set ' + (hist[he].si + 1) + '</span><span style="font-weight:700">' + hist[he].weight + ' lbs \u00d7 ' + hist[he].reps + '</span></div>';
+      }
+      h += '</div>';
+    }
+  }
+  if (!histDates.length) h += '<div style="padding:20px 16px;color:var(--txt3);text-align:center">No history yet.</div>';
+  return h;
+}
+
+// ═══════════════════════════════════════
+// PROGRAM EDITOR
+// ═══════════════════════════════════════
+function rEditor() {
+  var h = '<div style="padding:16px 16px 8px;font-size:22px;font-weight:800">Program Editor</div>';
+  h += '<div class="sec">Cycles</div>';
+  for (var i = 0; i < D.cycles.length; i++) {
+    var cc = D.cycles[i], act = cc.id === D.aid;
+    h += '<div style="background:var(--card);margin:8px 16px;border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);cursor:pointer;display:flex;justify-content:space-between;align-items:center;' + (act ? 'border:2px solid var(--acc)' : '') + '" data-act="goedcyc" data-cid="' + cc.id + '">';
+    h += '<div><div style="font-size:15px;font-weight:700">' + esc(cc.name) + '</div><div style="font-size:12px;color:var(--txt3)">' + cc.totalWeeks + ' weeks \u2022 ' + cc.daysPerWeek + ' days/wk</div></div>';
+    if (act) h += '<span style="font-size:10px;font-weight:700;color:var(--acc);background:var(--accbg);padding:2px 8px;border-radius:4px;text-transform:uppercase">Active</span>';
+    h += '</div>';
+  }
+  h += '<div style="padding:0 16px"><button class="btna" data-act="addcyc">+ New Cycle</button></div>';
+  h += rBackup();
+  h += rSettings();
+  return h;
+}
+
+function rEdCycle() {
+  var cc = null;
+  for (var i = 0; i < D.cycles.length; i++) { if (D.cycles[i].id === ST.sd.cid) cc = D.cycles[i]; }
+  if (!cc) return "";
+  var h = '<div class="dh"><button class="dh-bk" data-act="back">' + SVG.bkleft + '</button><div class="dh-t">' + esc(cc.name) + '</div></div>';
+  if (cc.id !== D.aid) h += '<div style="padding:0 16px 8px"><button class="btnacc" data-act="setaid" data-cid="' + cc.id + '">Set as Active Cycle</button></div>';
+
+  // Delete cycle button (can't delete if it's the only cycle)
+  if (D.cycles.length > 1) {
+    h += '<div style="padding:0 16px 12px"><button style="width:100%;padding:12px;border-radius:var(--rs);background:#fee;border:1px solid #fcc;color:var(--acc);font-size:14px;font-weight:700;text-align:center;cursor:pointer" data-act="delcyc" data-cid="' + cc.id + '">Delete This Cycle</button></div>';
+  }
+
+  for (var pi = 0; pi < cc.phases.length; pi++) {
+    var ph = cc.phases[pi];
+    h += '<div class="sec" style="color:' + ph.color + '">' + esc(ph.name) + '</div>';
+    for (var wi = 0; wi < ph.weeks.length; wi++) {
+      var w = ph.weeks[wi];
+      h += '<div style="background:var(--card);margin:8px 16px;border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow)"><div style="font-size:14px;font-weight:700;margin-bottom:8px">Week ' + w + '</div>';
+      var dks = ["Day 1", "Day 2", "Day 3", "Day 4"];
+      for (var di = 0; di < dks.length; di++) {
+        var dk = dks[di], day = (cc.weeks[w] || {})[dk];
+        h += '<button style="display:inline-block;padding:6px 12px;margin:0 4px 4px 0;border-radius:var(--rx);background:var(--card2);border:1px solid var(--bdr);font-size:12px;font-weight:600;color:var(--txt2);cursor:pointer" data-act="goedday" data-cid="' + cc.id + '" data-w="' + w + '" data-dk="' + dk + '">' + dk + ' (' + ((day ? day.exercises.length : 0)) + ')</button>';
+      }
+      h += '</div>';
+    }
+  }
+  return h;
+}
+
+function rEdDay() {
+  var cid = ST.sd.cid, w = ST.sd.w, dk = ST.sd.dk;
+  var cc = null;
+  for (var i = 0; i < D.cycles.length; i++) { if (D.cycles[i].id === cid) cc = D.cycles[i]; }
+  if (!cc || !cc.weeks[w] || !cc.weeks[w][dk]) return "";
+  var day = cc.weeks[w][dk];
+
+  var h = '<div class="dh"><button class="dh-bk" data-act="edback">' + SVG.bkleft + '</button><div class="dh-t">Week ' + w + ' \u2014 ' + esc(dk) + '</div></div>';
+  h += '<div style="padding:0 16px 16px">';
+  var ec = day.exercises.length;
+  for (var ei = 0; ei < ec; ei++) {
+    var ex = day.exercises[ei];
+    h += '<div class="edex">';
+    // Reorder + name + cat + delete
+    h += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">';
+    h += '<div style="display:flex;flex-direction:column;gap:2px">';
+    h += '<button class="edmv ' + (ei > 0 ? "on" : "off") + '" ' + (ei > 0 ? 'data-act="mvex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-dir="-1"' : '') + '>\u25b2</button>';
+    h += '<button class="edmv ' + (ei < ec - 1 ? "on" : "off") + '" ' + (ei < ec - 1 ? 'data-act="mvex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-dir="1"' : '') + '>\u25bc</button>';
+    h += '</div>';
+    h += '<button class="edinp" style="text-align:left;cursor:pointer;background:var(--card);flex:1" data-act="pickex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">' + esc(ex.n) + ' <span style="color:var(--acc);font-size:11px">\u25b8</span></button>';
+    h += '<select class="edsel" data-act="edcat" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">';
+    var catOpts = ["warmup", "primary", "strength_balance", "finisher", "plyometric", "cooldown", "custom"];
+    for (var ci = 0; ci < catOpts.length; ci++) h += '<option value="' + catOpts[ci] + '"' + (ex.cat === catOpts[ci] ? " selected" : "") + '>' + catOpts[ci].replace(/_/g, " ") + '</option>';
+    h += '</select>';
+    h += '<button class="eddel" data-act="delex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">\u00d7</button></div>';
+
+    // Sets
+    for (var si = 0; si < ex.s.length; si++) {
+      var s = ex.s[si];
+      h += '<div style="display:grid;grid-template-columns:20px 1fr 1fr 24px;gap:6px;align-items:center;margin-bottom:3px">';
+      h += '<div style="font-size:11px;color:var(--txt3);text-align:center">' + (si + 1) + '</div>';
+      h += '<input class="edinp" style="text-align:center;font-size:12px" value="' + esc(s.r) + '" placeholder="Reps" data-act="edsetr" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-si="' + si + '">';
+      h += '<input class="edinp" style="text-align:center;font-size:12px" value="' + esc(s.rpe) + '" placeholder="RPE" data-act="edsetrpe" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-si="' + si + '">';
+      h += '<button style="background:none;border:none;color:#ff6666;cursor:pointer;font-size:16px;font-weight:700" data-act="delset" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-si="' + si + '">\u2212</button></div>';
+    }
+    h += '<button style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:var(--rx);background:rgba(74,144,217,.1);border:1px solid rgba(74,144,217,.3);color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;margin-top:4px" data-act="addset2" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">+ Set</button>';
+    h += '</div>';
+  }
+  h += '<button class="btna" data-act="addex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '">+ Add Exercise</button>';
+  h += '</div>';
+  return h;
+}
+
+// ═══════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════
+function rStats() {
+  var c = cy(), names = allNames();
+  var totalLogs = 0, keys = Object.keys(D.logs || {});
+  for (var i = 0; i < keys.length; i++) { if (keys[i].indexOf(c.id) === 0 && D.logs[keys[i]].done) totalLogs++; }
+  var completedDays = 0;
+  var doneKeys = Object.keys(D.done[c.id] || {});
+  for (var i = 0; i < doneKeys.length; i++) { if (D.done[c.id][doneKeys[i]]) completedDays++; }
+
+  var h = '<div style="padding:16px 16px 8px;font-size:22px;font-weight:800">Stats</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 16px">';
+  h += '<div class="stbox" style="margin:0"><div class="stl">Sets Logged</div><div class="stv">' + totalLogs + '</div></div>';
+  h += '<div class="stbox" style="margin:0"><div class="stl">Days Complete</div><div class="stv">' + completedDays + '</div></div></div>';
+  h += '<div class="sec">Personal Records</div>';
+  for (var n = 0; n < names.length; n++) {
+    var pr = getPR(names[n]);
+    if (!pr) continue;
+    h += '<div class="bcard" data-act="gobankd" data-bn="' + b64e(names[n]) + '"><div style="display:flex;justify-content:space-between;align-items:center">';
+    h += '<div style="font-size:15px;font-weight:700">' + esc(names[n]) + '</div>';
+    h += '<div style="font-size:14px;font-weight:800;color:var(--acc)">' + pr + ' lbs</div></div></div>';
+  }
+  return h;
+}
+
+// ═══════════════════════════════════════
+// SETTINGS & BACKUP
+// ═══════════════════════════════════════
+function rSettings() {
+  var c = cy(), st = D.starts[c.id] || "";
+  var days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var h = '<div style="padding:16px"><div style="background:var(--card);border-radius:16px;padding:20px;border:1px solid var(--bdr)">';
+  h += '<div style="font-size:16px;font-weight:700;margin-bottom:4px">Cycle Start Date</div>';
+  h += '<div style="font-size:13px;color:var(--txt3);margin-bottom:12px">Choose the Monday your cycle begins.</div>';
+  h += '<input type="date" value="' + esc(st) + '" data-act="setstart" style="width:100%;padding:12px;border-radius:var(--rx);border:1px solid var(--bdr);background:var(--card);color:var(--txt);font-size:15px">';
+  if (st) h += '<div style="margin-top:8px;font-size:13px;color:var(--green)">\u2713 ' + new Date(st + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) + '</div>';
+  h += '</div>';
+  h += '<div style="margin-top:12px"><div style="font-size:14px;font-weight:600;color:var(--txt2);margin-bottom:8px">Training Days</div>';
+  for (var i = 0; i < 7; i++) {
+    var v = D.dayMap[i] || "";
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr)"><span style="font-size:14px;font-weight:600">' + days[i] + '</span>';
+    h += '<select data-act="setmap" data-di="' + i + '" style="padding:6px 10px;border-radius:var(--rx);border:1px solid var(--bdr);background:var(--card);color:var(--txt);font-size:13px">';
+    h += '<option value=""' + (v === "" ? " selected" : "") + '>Rest</option>';
+    h += '<option value="Day 1"' + (v === "Day 1" ? " selected" : "") + '>Day 1 \u2014 Lower</option>';
+    h += '<option value="Day 2"' + (v === "Day 2" ? " selected" : "") + '>Day 2 \u2014 Push</option>';
+    h += '<option value="Day 3"' + (v === "Day 3" ? " selected" : "") + '>Day 3 \u2014 Power</option>';
+    h += '<option value="Day 4"' + (v === "Day 4" ? " selected" : "") + '>Day 4 \u2014 Pull</option>';
+    h += '</select></div>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+function rBackup() {
+  var last = "";
+  try { last = localStorage.getItem("lift-last-bk") || ""; } catch (e) { }
+  var h = '<div class="bkc"><div style="font-size:16px;font-weight:700;margin-bottom:4px">Backup & Restore</div>';
+  h += '<div style="font-size:12px;color:var(--txt3);line-height:1.5;margin-bottom:4px">Export saves everything. Import restores from backup.</div>';
+  h += '<div class="bkb"><button class="bkn bke" data-act="export">\u2193 Export</button><button class="bkn bki" data-act="import">\u2191 Import</button></div>';
+  if (last) h += '<div style="margin-top:10px;font-size:11px;color:var(--txt3);text-align:center">Last backup: ' + esc(last) + '</div>';
+  h += '</div>';
+  return h;
+}
+
+// ═══════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════
+function closeModal() { $("modal").innerHTML = ""; }
+
+function openSwapModal(dt, idx) {
+  var info = exsFor(dt);
+  if (!info) return;
+  var curEx = info.exercises[idx];
+  var bank = getBank();
+  window._swapCtx = { dt: dt, idx: idx };
+
+  var h = '<div class="mov" data-act="closemod"><div class="mod" onclick="event.stopPropagation()">';
+  h += '<div class="mha"></div><div class="mti">Swap: ' + esc(curEx.n) + '</div>';
+  h += '<input class="minp" id="swp-q" placeholder="Search exercises..." data-act="swpfilter" style="margin-bottom:12px">';
+  h += '<div id="swp-list">';
+  // Sort: same category first
+  var items = bank.filter(function (b) { return b.name !== curEx.n; }).sort(function (a, b) {
+    if (a.category === curEx.cat && b.category !== curEx.cat) return -1;
+    if (b.category === curEx.cat && a.category !== curEx.cat) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  for (var i = 0; i < items.length; i++) {
+    h += '<div class="mit swp-it" data-name="' + esc(items[i].name) + '" data-act="doswap" data-bn="' + b64e(items[i].name) + '"><span>' + esc(items[i].name) + '</span><span class="cat">' + esc(items[i].category.replace(/_/g, " ")) + '</span></div>';
+  }
+  h += '</div>';
+  h += '<div id="swp-cr" class="hidden" style="margin-top:8px"><button class="mbtn" data-act="swpcreate" id="swp-cr-btn">+ Create & Swap</button></div>';
+  h += '</div></div>';
+  $("modal").innerHTML = h;
+  setTimeout(function () { var el = $("swp-q"); if (el) el.focus(); }, 100);
+}
+
+function openPickerModal(cid, w, dk, ei) {
+  var bank = getBank();
+  var cats = [], cSeen = {};
+  for (var i = 0; i < bank.length; i++) { if (!cSeen[bank[i].category]) { cSeen[bank[i].category] = 1; cats.push(bank[i].category); } }
+  cats.sort();
+  window._pickCtx = { cid: cid, w: parseInt(w), dk: dk, ei: parseInt(ei) };
+
+  var h = '<div class="mov" data-act="closemod"><div class="mod" onclick="event.stopPropagation()">';
+  h += '<div class="mha"></div><div class="mti">Choose Exercise</div>';
+  h += '<input class="minp" id="pick-q" placeholder="Search exercises..." data-act="pickfilter" style="margin-bottom:12px">';
+  h += '<div id="pick-cr" class="hidden" style="margin-bottom:12px"><button class="mbtn" data-act="pickcreate" id="pick-cr-btn">+ Create New</button></div>';
+  h += '<div id="pick-list">';
+  for (var ci = 0; ci < cats.length; ci++) {
+    var cat = cats[ci];
+    h += '<div class="pick-cat" data-cat="' + esc(cat) + '"><div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1px;margin:8px 0 4px">' + esc(cat.replace(/_/g, " ")) + '</div>';
+    for (var bi = 0; bi < bank.length; bi++) {
+      if (bank[bi].category !== cat) continue;
+      h += '<div class="mit pick-it" data-name="' + esc(bank[bi].name) + '" data-act="dopick" data-bn="' + b64e(bank[bi].name) + '"><span>' + esc(bank[bi].name) + '</span></div>';
+    }
+    h += '</div>';
+  }
+  h += '</div></div></div>';
+  $("modal").innerHTML = h;
+  setTimeout(function () { var el = $("pick-q"); if (el) el.focus(); }, 100);
+}
+
+function openAddBankModal() {
+  var h = '<div class="mov" data-act="closemod"><div class="mod" onclick="event.stopPropagation()">';
+  h += '<div class="mha"></div><div class="mti">Add Exercise</div>';
+  h += '<input class="minp" id="nb-name" placeholder="Exercise name...">';
+  h += '<select class="minp" id="nb-cat"><option value="primary">Primary</option><option value="strength_balance">Strength Balance</option><option value="finisher">Finisher</option><option value="plyometric">Plyometric</option><option value="warmup">Warmup</option><option value="cooldown">Cooldown</option><option value="custom">Custom</option></select>';
+  h += '<button class="mbtn" data-act="doaddbank">Add Exercise</button>';
+  h += '</div></div>';
+  $("modal").innerHTML = h;
+}
+
+// ═══════════════════════════════════════
+// EVENT DELEGATION
+// ═══════════════════════════════════════
+document.addEventListener("click", function (e) {
+  // Calendar day clicks (no data-act, just data-dt)
+  var calDay = e.target.closest(".cal-d[data-dt]");
+  if (calDay && !calDay.classList.contains("om")) { ST.calSel = calDay.dataset.dt; render(); return; }
+
+  var el = e.target.closest("[data-act]");
+  if (!el) return;
+  var act = el.dataset.act;
+
+  // Skip click handling for inputs/selects - let native pickers work
+  var tag = el.tagName.toLowerCase();
+  if ((tag === "input" || tag === "select" || tag === "textarea") && (act === "setstart" || act === "setmap" || act === "edcat" || act === "edsetr" || act === "edsetrpe" || act === "logw" || act === "logr" || act === "cmt" || act === "swpfilter" || act === "pickfilter")) return;
+
+  switch (act) {
+    // Navigation
+    case "loadwk": W.loadWorkout(el.dataset.dt); break;
+    case "dayback": W.goBack(); break;
+    case "exback": W.goBack(); break;
+    case "back": W.goBack(); break;
+    case "edback": W.goSub("edcyc", { cid: ST.sd.cid }); break;
+
+    // Day page
+    case "goex": e.stopPropagation(); W.goSub("exd", { date: el.dataset.dt, ei: parseInt(el.dataset.i) }); break;
+    case "swap": e.stopPropagation(); openSwapModal(el.dataset.dt, parseInt(el.dataset.i)); break;
+    case "toggleday": {
+      var c = cy(), dt2 = el.dataset.dt;
+      if (!D.done[c.id]) D.done[c.id] = {};
+      D.done[c.id][dt2] = !D.done[c.id][dt2];
+      save(); render(); break;
+    }
+
+    // Exercise detail
+    case "logw": { var k = el.dataset.k; if (!D.logs[k]) D.logs[k] = {}; D.logs[k].w = el.value; D.logs[k].dt = today(); save(); break; }
+    case "logr": { var k2 = el.dataset.k; if (!D.logs[k2]) D.logs[k2] = {}; D.logs[k2].r = el.value; D.logs[k2].dt = today(); save(); break; }
+    case "schk": {
+      var k3 = el.dataset.k;
+      if (!D.logs[k3]) D.logs[k3] = {};
+      D.logs[k3].done = !D.logs[k3].done; save();
+      el.classList.toggle("dn", D.logs[k3].done);
+      el.innerHTML = D.logs[k3].done ? SVG.chk : "";
+      break;
+    }
+    case "addset": {
+      var c2 = cy(), eKey = c2.id + "__" + el.dataset.dt + "__extra__" + el.dataset.ei;
+      if (!D.logs[eKey]) D.logs[eKey] = { count: 0 };
+      D.logs[eKey].count++; save(); render(); break;
+    }
+    case "cmt": {
+      if (!D.cmt) D.cmt = {};
+      D.cmt[el.dataset.ck] = el.value; save(); break;
+    }
+    case "thist": ST.histOpen[el.dataset.hd] = !ST.histOpen[el.dataset.hd]; render(); break;
+
+    // Swap modal
+    case "closemod": closeModal(); break;
+    case "doswap": {
+      var ctx = window._swapCtx; if (!ctx) break;
+      var nm = b64d(el.dataset.bn);
+      var c3 = cy();
+      if (!D.ov[c3.id]) D.ov[c3.id] = {};
+      if (!D.ov[c3.id][ctx.dt]) D.ov[c3.id][ctx.dt] = {};
+      D.ov[c3.id][ctx.dt][ctx.idx] = { n: nm };
+      save(); closeModal(); render(); break;
+    }
+    case "swpfilter": {
+      var q = (el.value || "").toLowerCase().trim();
+      var items = document.querySelectorAll(".swp-it");
+      items.forEach(function (it) { it.style.display = (!q || it.dataset.name.toLowerCase().indexOf(q) >= 0) ? "" : "none"; });
+      var cr = $("swp-cr"), crb = $("swp-cr-btn");
+      if (q) { cr.classList.remove("hidden"); crb.textContent = '+ Create "' + q + '" & Swap'; }
+      else { cr.classList.add("hidden"); }
+      break;
+    }
+    case "swpcreate": {
+      var qv = ($("swp-q") || {}).value || ""; qv = qv.trim();
+      if (!qv) break;
+      addBank(qv, "custom");
+      var ctx2 = window._swapCtx; if (!ctx2) break;
+      var c4 = cy();
+      if (!D.ov[c4.id]) D.ov[c4.id] = {};
+      if (!D.ov[c4.id][ctx2.dt]) D.ov[c4.id][ctx2.dt] = {};
+      D.ov[c4.id][ctx2.dt][ctx2.idx] = { n: qv };
+      save(); closeModal(); render(); break;
+    }
+
+    // Bank
+    case "addbank": openAddBankModal(); break;
+    case "doaddbank": {
+      var nm2 = ($("nb-name") || {}).value || ""; nm2 = nm2.trim();
+      var cat2 = ($("nb-cat") || {}).value;
+      if (!nm2) break;
+      addBank(nm2, cat2); closeModal(); render(); break;
+    }
+    case "gobankd": W.goSub("bankd", { name: b64d(el.dataset.bn) }); break;
+
+    // Editor
+    case "goedcyc": W.goSub("edcyc", { cid: el.dataset.cid }); break;
+    case "goedday": W.goSub("edday", { cid: el.dataset.cid, w: parseInt(el.dataset.w), dk: el.dataset.dk }); break;
+    case "addcyc": {
+      var built = mkProg();
+      built.prog.id = "cycle-" + uid();
+      built.prog.name = "New Cycle " + (D.cycles.length + 1);
+      D.cycles.push(built.prog); D.aid = built.prog.id; save(); render(); break;
+    }
+    case "setaid": D.aid = el.dataset.cid; save(); render(); break;
+    case "delcyc": {
+      var dcid = el.dataset.cid;
+      // Show confirmation state on the button
+      if (el.dataset.confirm !== "yes") {
+        el.textContent = "Tap Again to Confirm Delete";
+        el.style.background = "#c45a3c";
+        el.style.color = "#fff";
+        el.dataset.confirm = "yes";
+        // Reset after 3 seconds if not confirmed
+        setTimeout(function () {
+          if (el && el.dataset.confirm === "yes") {
+            el.textContent = "Delete This Cycle";
+            el.style.background = "#fee";
+            el.style.color = "#c45a3c";
+            el.dataset.confirm = "";
+          }
+        }, 3000);
+        break;
+      }
+      D.cycles = D.cycles.filter(function (c) { return c.id !== dcid; });
+      if (D.aid === dcid && D.cycles.length > 0) D.aid = D.cycles[0].id;
+      delete D.starts[dcid];
+      delete D.done[dcid];
+      delete D.ov[dcid];
+      save();
+      ST.sub = null; ST.sd = {};
+      render();
+      break;
+    }
+    case "pickex": openPickerModal(el.dataset.cid, el.dataset.w, el.dataset.dk, el.dataset.ei); break;
+    case "pickfilter": {
+      var q2 = (el.value || "").toLowerCase().trim();
+      document.querySelectorAll(".pick-it").forEach(function (it) { it.style.display = (!q2 || it.dataset.name.toLowerCase().indexOf(q2) >= 0) ? "" : "none"; });
+      document.querySelectorAll(".pick-cat").forEach(function (cat) {
+        var vis = cat.querySelectorAll('.pick-it:not([style*="display: none"])');
+        cat.style.display = vis.length > 0 ? "" : "none";
+      });
+      var cr2 = $("pick-cr"), crb2 = $("pick-cr-btn");
+      if (q2) { cr2.classList.remove("hidden"); crb2.textContent = '+ Create "' + q2 + '"'; }
+      else { cr2.classList.add("hidden"); }
+      break;
+    }
+    case "dopick": {
+      var ctx3 = window._pickCtx; if (!ctx3) break;
+      var nm3 = b64d(el.dataset.bn);
+      var cc2 = null;
+      for (var i = 0; i < D.cycles.length; i++) { if (D.cycles[i].id === ctx3.cid) cc2 = D.cycles[i]; }
+      if (cc2) { cc2.weeks[ctx3.w][ctx3.dk].exercises[ctx3.ei].n = nm3; save(); }
+      closeModal(); render(); break;
+    }
+    case "pickcreate": {
+      var qv2 = ($("pick-q") || {}).value || ""; qv2 = qv2.trim();
+      if (!qv2) break;
+      addBank(qv2, "custom");
+      var ctx4 = window._pickCtx; if (!ctx4) break;
+      var cc3 = null;
+      for (var i2 = 0; i2 < D.cycles.length; i2++) { if (D.cycles[i2].id === ctx4.cid) cc3 = D.cycles[i2]; }
+      if (cc3) { cc3.weeks[ctx4.w][ctx4.dk].exercises[ctx4.ei].n = qv2; save(); }
+      closeModal(); render(); break;
+    }
+    case "edcat": {
+      var cc4 = null;
+      for (var i3 = 0; i3 < D.cycles.length; i3++) { if (D.cycles[i3].id === el.dataset.cid) cc4 = D.cycles[i3]; }
+      if (cc4) { cc4.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises[parseInt(el.dataset.ei)].cat = el.value; save(); }
+      break;
+    }
+    case "delex": {
+      var cc5 = null;
+      for (var i4 = 0; i4 < D.cycles.length; i4++) { if (D.cycles[i4].id === el.dataset.cid) cc5 = D.cycles[i4]; }
+      if (cc5) { cc5.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises.splice(parseInt(el.dataset.ei), 1); save(); render(); }
+      break;
+    }
+    case "mvex": {
+      var cc6 = null;
+      for (var i5 = 0; i5 < D.cycles.length; i5++) { if (D.cycles[i5].id === el.dataset.cid) cc6 = D.cycles[i5]; }
+      if (cc6) {
+        var exs = cc6.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises;
+        var idx = parseInt(el.dataset.ei), nIdx = idx + parseInt(el.dataset.dir);
+        if (nIdx >= 0 && nIdx < exs.length) { var tmp = exs[idx]; exs[idx] = exs[nIdx]; exs[nIdx] = tmp; save(); render(); }
+      }
+      break;
+    }
+    case "addex": {
+      var cc7 = null;
+      for (var i6 = 0; i6 < D.cycles.length; i6++) { if (D.cycles[i6].id === el.dataset.cid) cc7 = D.cycles[i6]; }
+      if (cc7) { cc7.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises.push({ n: "New Exercise", t: "accessory", tp: "Normal", cat: "custom", s: [{ r: "8", rpe: "7" }], rest: "90s" }); save(); render(); }
+      break;
+    }
+    case "addset2": {
+      var cc8 = null;
+      for (var i7 = 0; i7 < D.cycles.length; i7++) { if (D.cycles[i7].id === el.dataset.cid) cc8 = D.cycles[i7]; }
+      if (cc8) { cc8.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises[parseInt(el.dataset.ei)].s.push({ r: "8", rpe: "7" }); save(); render(); }
+      break;
+    }
+    case "delset": {
+      var cc9 = null;
+      for (var i8 = 0; i8 < D.cycles.length; i8++) { if (D.cycles[i8].id === el.dataset.cid) cc9 = D.cycles[i8]; }
+      if (cc9) { cc9.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises[parseInt(el.dataset.ei)].s.splice(parseInt(el.dataset.si), 1); save(); render(); }
+      break;
+    }
+    case "edsetr": {
+      var cc10 = null;
+      for (var i9 = 0; i9 < D.cycles.length; i9++) { if (D.cycles[i9].id === el.dataset.cid) cc10 = D.cycles[i9]; }
+      if (cc10) { cc10.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises[parseInt(el.dataset.ei)].s[parseInt(el.dataset.si)].r = el.value; save(); }
+      break;
+    }
+    case "edsetrpe": {
+      var cc11 = null;
+      for (var i10 = 0; i10 < D.cycles.length; i10++) { if (D.cycles[i10].id === el.dataset.cid) cc11 = D.cycles[i10]; }
+      if (cc11) { cc11.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises[parseInt(el.dataset.ei)].s[parseInt(el.dataset.si)].rpe = el.value; save(); }
+      break;
+    }
+
+    // Settings - ONLY handle in change event, not click (native pickers need click to open)
+    // case "setstart" and "setmap" handled in change listener below
+
+    // Backup
+    case "export": {
+      try {
+        var blob = new Blob([JSON.stringify(D, null, 2)], { type: "application/json" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url; a.download = "lift-backup-" + today() + ".json";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        try { localStorage.setItem("lift-last-bk", new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })); } catch (e2) { }
+        render();
+      } catch (e) { alert("Export failed: " + e.message); }
+      break;
+    }
+    case "import": $("imp").click(); break;
+  }
+});
+
+// Calendar day clicks - handled in main document click handler above
+// (removed separate cnt listener to avoid event ordering issues)
+
+// Input change events (for data-act on inputs/selects/textareas)
+$("cnt").addEventListener("input", function (e) {
+  var el = e.target.closest("[data-act]");
+  if (!el) return;
+  var act = el.dataset.act;
+  if (act === "swpfilter" || act === "pickfilter") {
+    // Trigger the filter
+    el.dispatchEvent(new Event("click", { bubbles: true }));
+  }
+  if (act === "logw" || act === "logr") {
+    var k = el.dataset.k;
+    if (!D.logs[k]) D.logs[k] = {};
+    D.logs[k][act === "logw" ? "w" : "r"] = el.value;
+    D.logs[k].dt = today();
+    save();
+  }
+  if (act === "cmt") {
+    if (!D.cmt) D.cmt = {};
+    D.cmt[el.dataset.ck] = el.value; save();
+  }
+  if (act === "edsetr" || act === "edsetrpe") {
+    var cc = null;
+    for (var i = 0; i < D.cycles.length; i++) { if (D.cycles[i].id === el.dataset.cid) cc = D.cycles[i]; }
+    if (cc) {
+      var field = act === "edsetr" ? "r" : "rpe";
+      cc.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises[parseInt(el.dataset.ei)].s[parseInt(el.dataset.si)][field] = el.value;
+      save();
+    }
+  }
+});
+
+// Change events for selects
+$("cnt").addEventListener("change", function (e) {
+  var el = e.target.closest("[data-act]");
+  if (!el) return;
+  if (el.dataset.act === "setstart") { D.starts[cy().id] = el.value; save(); render(); }
+  if (el.dataset.act === "setmap") { D.dayMap[parseInt(el.dataset.di)] = el.value || null; save(); render(); }
+  if (el.dataset.act === "edcat") {
+    var cc = null;
+    for (var i = 0; i < D.cycles.length; i++) { if (D.cycles[i].id === el.dataset.cid) cc = D.cycles[i]; }
+    if (cc) { cc.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises[parseInt(el.dataset.ei)].cat = el.value; save(); }
+  }
+});
+
+// Import file handler
+$("imp").addEventListener("change", function (e) {
+  var f = e.target.files ? e.target.files[0] : null;
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function (ev) {
+    try {
+      var d = JSON.parse(ev.target.result);
+      if (!d.cycles) { alert("Invalid backup"); return; }
+      D = d; save(); render(); alert("Restored!");
+    } catch (err) { alert("Error: " + err.message); }
+  };
+  reader.readAsText(f);
+  e.target.value = "";
+});
+
+// ═══════════════════════════════════════
+// CYCLE DROPDOWN
+// ═══════════════════════════════════════
+W.toggleDrop = function () {
+  var dd = $("drop"), ov = $("drop-ov");
+  if (dd.classList.contains("hidden")) {
+    var h = "";
+    for (var i = 0; i < D.cycles.length; i++) {
+      var cc = D.cycles[i], act = cc.id === D.aid;
+      h += '<div class="ddi" data-cid="' + cc.id + '">' + esc(cc.name) + (act ? '<span style="color:var(--acc);font-weight:800">\u2713</span>' : '') + '</div>';
+    }
+    dd.innerHTML = h;
+    dd.classList.remove("hidden");
+    ov.classList.remove("hidden");
+    dd.addEventListener("click", function handler(e) {
+      var it = e.target.closest(".ddi");
+      if (it) { D.aid = it.dataset.cid; save(); }
+      dd.classList.add("hidden"); ov.classList.add("hidden");
+      dd.removeEventListener("click", handler);
+      render();
+    });
+  } else {
+    dd.classList.add("hidden");
+    ov.classList.add("hidden");
+  }
+};
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+D = load() || initData();
+if (!D.done) D.done = {};
+if (!D.ov) D.ov = {};
+if (!D.cmt) D.cmt = {};
+if (!D.bank) D.bank = initData().bank;
+save();
+render();
+</script>
+</body>
+</html>
