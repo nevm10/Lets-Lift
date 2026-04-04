@@ -21,10 +21,10 @@ textarea{resize:none}
 button{cursor:pointer;border:none;background:none}
 .hidden{display:none!important}
 
-#app{max-width:430px;margin:0 auto;height:100%;display:flex;flex-direction:column;background:var(--bg)}
+#app{max-width:430px;margin:0 auto;height:100%;display:flex;flex-direction:column;background:var(--bg);overflow-x:hidden}
 .hdr{padding:max(env(safe-area-inset-top),8px) 16px 10px;background:var(--bg);position:sticky;top:0;z-index:100}
 .cyc-btn{display:flex;align-items:center;gap:6px;background:var(--acc);color:#fff;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;margin:0 auto;width:fit-content}
-.cnt{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:85px}
+.cnt{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:85px}
 
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--card);border-top:1px solid var(--bdr);display:flex;justify-content:space-around;padding:6px 0 max(env(safe-area-inset-bottom),12px);z-index:100}
 .nb{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 10px;color:var(--txt3);transition:color .15s}
@@ -254,22 +254,48 @@ function addBank(name, cat) {
 }
 
 function getHist(name) {
-  var c = cy(), res = [];
+  var res = [];
   var keys = Object.keys(D.logs || {});
   for (var k = 0; k < keys.length; k++) {
     var key = keys[k];
-    if (key.indexOf(c.id) !== 0) continue;
     var v = D.logs[key];
+    if (!v || (!v.w && !v.r)) continue;
     var ps = key.split("__");
-    var dt = ps[1], ei = parseInt(ps[2].replace("e", "")), si = parseInt(ps[3].replace("s", ""));
-    var info = exsFor(dt);
-    if (!info || !info.exercises[ei]) continue;
-    if (info.exercises[ei].n === name && v.w && v.r) {
-      res.push({ date: dt, si: si, weight: parseFloat(v.w), reps: parseInt(v.r), rpe: v.rpe || "" });
+    if (ps.length < 4) continue;
+    var cid = ps[0], dt = ps[1], ei = parseInt(ps[2].replace("e", "")), si = parseInt(ps[3].replace("s", ""));
+    // Use embedded exercise name if available, otherwise resolve from cycle
+    var exName = v.en || resolveExName(cid, dt, ei);
+    if (exName === name && v.w && v.r) {
+      res.push({ date: dt, si: si, weight: parseFloat(v.w), reps: parseInt(v.r), rpe: v.rpe || "", cid: cid });
     }
   }
   res.sort(function (a, b) { return a.date > b.date ? -1 : a.date < b.date ? 1 : a.si - b.si; });
   return res;
+}
+
+// Resolve what exercise name was at a given cycle/date/index
+function resolveExName(cid, dt, ei) {
+  // Find the cycle (may be deleted, so check all)
+  var cc = null;
+  for (var i = 0; i < D.cycles.length; i++) { if (D.cycles[i].id === cid) cc = D.cycles[i]; }
+  if (!cc) return null;
+  // Check overrides first
+  var ov = (D.ov[cid] || {})[dt] || {};
+  if (ov[ei] && ov[ei].n) return ov[ei].n;
+  // Resolve from cycle schedule
+  if (!D.starts[cid]) return null;
+  var start = new Date(D.starts[cid] + "T00:00:00");
+  var d = new Date(dt + "T00:00:00");
+  var diff = Math.floor((d - start) / 864e5);
+  if (diff < 0) return null;
+  var wk = Math.floor(diff / 7) + 1;
+  if (wk > cc.totalWeeks) return null;
+  var dow = d.getDay();
+  var dk = D.dayMap[dow];
+  if (!dk || !cc.weeks[wk] || !cc.weeks[wk][dk]) return null;
+  var exs = cc.weeks[wk][dk].exercises;
+  if (ei >= 0 && ei < exs.length) return exs[ei].n;
+  return null;
 }
 
 function getPR(name) {
@@ -281,13 +307,17 @@ function getPR(name) {
 }
 
 function allNames() {
-  var c = cy(), s = {};
-  var wks = Object.keys(c.weeks);
-  for (var w = 0; w < wks.length; w++) {
-    var days = Object.keys(c.weeks[wks[w]]);
-    for (var d = 0; d < days.length; d++) {
-      var exs = c.weeks[wks[w]][days[d]].exercises;
-      for (var e = 0; e < exs.length; e++) s[exs[e].n] = 1;
+  var s = {};
+  // From ALL cycles
+  for (var ci = 0; ci < D.cycles.length; ci++) {
+    var c = D.cycles[ci];
+    var wks = Object.keys(c.weeks);
+    for (var w = 0; w < wks.length; w++) {
+      var days = Object.keys(c.weeks[wks[w]]);
+      for (var d = 0; d < days.length; d++) {
+        var exs = c.weeks[wks[w]][days[d]].exercises;
+        for (var e = 0; e < exs.length; e++) s[exs[e].n] = 1;
+      }
     }
   }
   var bank = D.bank || [];
@@ -411,10 +441,232 @@ function mkProg() {
 
 function initData() {
   var built = mkProg();
+  var built2 = mkProg2();
+  // Merge banks
+  var bankMap = {};
+  var mergedBank = built.bank.slice();
+  for (var i = 0; i < mergedBank.length; i++) bankMap[mergedBank[i].name] = 1;
+  for (var j = 0; j < built2.bank.length; j++) {
+    if (!bankMap[built2.bank[j].name]) { mergedBank.push(built2.bank[j]); bankMap[built2.bank[j].name] = 1; }
+  }
   return {
-    cycles: [built.prog], aid: "cycle-1", starts: {}, logs: {},
+    cycles: [built.prog, built2.prog], aid: "cycle-2", starts: {}, logs: {},
     dayMap: { 0: null, 1: "Day 1", 2: "Day 2", 3: null, 4: "Day 3", 5: "Day 4", 6: null },
-    done: {}, ov: {}, bank: built.bank, cmt: {}
+    done: {}, ov: {}, bank: mergedBank, cmt: {}
+  };
+}
+
+function mkProg2() {
+  var phases = [
+    { id: "q1", name: "Phase 1: Hypertrophy", weeks: [1, 2, 3, 4], color: "#c45a3c" },
+    { id: "q2", name: "Phase 2: Strength", weeks: [5, 6, 7, 8], color: "#d4715a" },
+    { id: "q3", name: "Phase 3: Peak", weeks: [9, 10, 11, 12], color: "#3a8a5c" }
+  ];
+
+  // Helpers
+  function isOdd(w) { return w % 2 === 1; }
+  function p1Reps(w) {
+    if (w <= 4) return [{ r: "12", rpe: "7" }, { r: "10", rpe: "8" }, { r: "8", rpe: "9" }, { r: "AMRAP", rpe: "10" }];
+    if (w <= 8) return [{ r: "10", rpe: "7" }, { r: "8", rpe: "8" }, { r: "6", rpe: "9" }, { r: "AMRAP", rpe: "10" }];
+    return [{ r: "6", rpe: "7" }, { r: "4", rpe: "8" }, { r: "2", rpe: "9" }, { r: "AMRAP", rpe: "10" }];
+  }
+  function p2Reps(w) {
+    if (w <= 4) return [{ r: "12", rpe: "7" }, { r: "10", rpe: "8" }, { r: "8", rpe: "9" }];
+    if (w <= 8) return [{ r: "10", rpe: "7" }, { r: "8", rpe: "8" }, { r: "6", rpe: "9" }];
+    return [{ r: "8", rpe: "7" }, { r: "6", rpe: "8" }, { r: "4", rpe: "9" }];
+  }
+  function s3(rpe1, rpe2, rpe3, reps) { return [{ r: reps, rpe: rpe1 }, { r: reps, rpe: rpe2 }, { r: reps, rpe: rpe3 }]; }
+  function s3flat(reps) { return [{ r: reps, rpe: "—" }, { r: reps, rpe: "—" }, { r: reps, rpe: "—" }]; }
+  function s2flat(reps) { return [{ r: reps, rpe: "—" }, { r: reps, rpe: "—" }]; }
+
+  var weeks = {};
+  var dl = { "Day 1": "Upper Push/Pull", "Day 2": "Lower Strength", "Day 3": "Upper Hypertrophy", "Day 4": "Lower Power" };
+
+  for (var w = 1; w <= 12; w++) {
+    var odd = isOdd(w);
+    var days = {};
+
+    // ═══ DAY 1: Upper Push/Pull ═══
+    var d1 = [];
+    // Warmup (superset)
+    var ssW1 = "ss-d1w-" + w;
+    d1.push({ n: "Kneeling Kettlebell Halo", t: "warmup", tp: "—", cat: "warmup", s: s2flat("8"), ssGroup: ssW1 });
+    d1.push({ n: "Ring Rows", t: "warmup", tp: "—", cat: "warmup", s: s2flat("8"), ssGroup: ssW1 });
+    // Primary 1: Bench
+    d1.push({ n: "Bench Press", t: "compound", tp: "Normal", cat: "primary", s: p1Reps(w),
+      guide: odd ? "Tempo: 20X1. 120s rest. Use set 1 weight for set 4" : "Tempo: 32X1. 120s rest. Use set 1 weight for set 4" });
+    // Primary 2
+    if (odd) {
+      d1.push({ n: "Pronated Bent Over Rows", t: "compound", tp: "Normal", cat: "primary", s: p2Reps(w), guide: "Tempo: 31X2. 90s rest" });
+    } else {
+      d1.push({ n: "Supinated Bent Over Rows", t: "compound", tp: "Normal", cat: "primary", s: p2Reps(w), guide: "Tempo: 31X2. 90s rest" });
+    }
+    // Strength Balance (superset)
+    var ssD1sb = "ss-d1sb-" + w;
+    if (odd) {
+      d1.push({ n: "Pull-Ups", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3flat("6"), ssGroup: ssD1sb, guide: "Tempo: 31X1. 30s between exercises, 90s after 2nd" });
+      d1.push({ n: "Dips", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3flat("6"), ssGroup: ssD1sb, guide: "Tempo: 31X1. 30s between exercises, 90s after 2nd" });
+    } else {
+      d1.push({ n: "Dumbbell Pullovers", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3flat("10"), ssGroup: ssD1sb, guide: "Tempo: 31X1. 30s between exercises, 90s after 2nd" });
+      d1.push({ n: "Offset Push-Ups", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3flat("10"), ssGroup: ssD1sb, guide: "Tempo: 31X1. 30s between exercises, 90s after 2nd" });
+    }
+    // Strength Balance 2
+    if (odd) {
+      d1.push({ n: "Dumbbell Full Raise", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3flat("12"), guide: "60s rest" });
+    } else {
+      d1.push({ n: "Kettlebell Front Raise", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3flat("12"), guide: "60s rest" });
+    }
+    // Finisher (superset)
+    var ssD1f = "ss-d1f-" + w;
+    if (odd) {
+      d1.push({ n: "Dumbbell Tricep Extension", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD1f, guide: "Tempo: 30X0. 30s between exercises, 60s after 2nd" });
+      d1.push({ n: "Dumbbell Curls", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD1f, guide: "Tempo: 30X0. 30s between exercises, 60s after 2nd" });
+    } else {
+      d1.push({ n: "Dumbbell Skull Crushers", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD1f, guide: "Tempo: 30X0. 30s between exercises, 60s after 2nd" });
+      d1.push({ n: "Zottman Curls", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD1f, guide: "Tempo: 30X0. 30s between exercises, 60s after 2nd" });
+    }
+    // Plyometric
+    d1.push({ n: "Explosive Push-Up", t: "plyo", tp: "Explosive", cat: "plyometric", s: s3flat("10"), guide: "60s rest" });
+
+    days["Day 1"] = { label: "Day 1 \u2014 " + dl["Day 1"], exercises: d1 };
+
+    // ═══ DAY 2: Lower Strength ═══
+    var d2 = [];
+    // Warmup (superset)
+    var ssW2 = "ss-d2w-" + w;
+    d2.push({ n: "Knees Over Toes Lunges", t: "warmup", tp: "—", cat: "warmup", s: s2flat("8"), ssGroup: ssW2 });
+    d2.push({ n: "Seated Good Mornings", t: "warmup", tp: "—", cat: "warmup", s: s2flat("8"), ssGroup: ssW2 });
+    // Primary 1: Back Squat
+    d2.push({ n: "Back Squat", t: "compound", tp: "Normal", cat: "primary", s: p1Reps(w),
+      guide: odd ? "Tempo: 20X1. 180s rest. Use set 1 weight for set 4" : "Tempo: 32X1. 180s rest. Use set 1 weight for set 4" });
+    // Primary 2
+    if (odd) {
+      d2.push({ n: "Deadlift", t: "compound", tp: "Normal", cat: "primary", s: p2Reps(w), guide: "Tempo: 20X1. 120s rest" });
+    } else {
+      d2.push({ n: "Sumo Deadlift", t: "compound", tp: "Normal", cat: "primary", s: p2Reps(w), guide: "Tempo: 20X1. 120s rest" });
+    }
+    // Strength Balance
+    if (odd) {
+      d2.push({ n: "Bulgarian Split Squat", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3("7", "8", "9", "8/leg"), guide: "Tempo: 20X1. 90s rest" });
+    } else {
+      d2.push({ n: "Dumbbell Lunges", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3("7", "8", "9", "8/leg"), guide: "Tempo: 20X1. 90s rest" });
+    }
+    // Strength Balance 2 (all weeks)
+    d2.push({ n: "Medicine Ball Hamstring Curl", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3flat("10"), guide: "Tempo: 31X2. 60s rest" });
+    // Finisher (superset)
+    var ssD2f = "ss-d2f-" + w;
+    if (odd) {
+      d2.push({ n: "Dumbbell Calf Raises", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD2f, guide: "Tempo: 31X1. 30s between exercises, 60s after 2nd" });
+      d2.push({ n: "Farmers Carry", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD2f, guide: "Tempo: 31X1. 30s between exercises, 60s after 2nd" });
+    } else {
+      d2.push({ n: "Single Leg Dumbbell Calf Raises", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD2f, guide: "Tempo: 31X1. 30s between exercises, 60s after 2nd" });
+      d2.push({ n: "Farmers Carry", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD2f, guide: "Tempo: 31X1. 30s between exercises, 60s after 2nd" });
+    }
+    // Plyometric
+    d2.push({ n: "Box Jumps", t: "plyo", tp: "Explosive", cat: "plyometric", s: s3flat("10"), guide: "60s rest" });
+
+    days["Day 2"] = { label: "Day 2 \u2014 " + dl["Day 2"], exercises: d2 };
+
+    // ═══ DAY 3: Upper Hypertrophy ═══
+    var d3 = [];
+    // Warmup (superset)
+    var ssW3 = "ss-d3w-" + w;
+    d3.push({ n: "Half Kneeling Kettlebell Press", t: "warmup", tp: "—", cat: "warmup", s: s2flat("8"), ssGroup: ssW3 });
+    d3.push({ n: "Face Pulls", t: "warmup", tp: "—", cat: "warmup", s: s2flat("8"), ssGroup: ssW3 });
+    // Primary 1: Incline Bench
+    d3.push({ n: "Incline Bench Press", t: "compound", tp: "Normal", cat: "primary", s: p1Reps(w),
+      guide: odd ? "Tempo: 20X1. 120s rest. Use set 1 weight for set 4" : "Tempo: 32X1. 120s rest. Use set 1 weight for set 4" });
+    // Primary 2
+    if (odd) {
+      d3.push({ n: "Shoulder Press", t: "compound", tp: "Normal", cat: "primary", s: p2Reps(w), guide: "Tempo: 21X0. 90s rest" });
+    } else {
+      d3.push({ n: "Seated Dumbbell Shoulder Press", t: "compound", tp: "Normal", cat: "primary", s: p2Reps(w), guide: "Tempo: 21X0. 90s rest" });
+    }
+    // Strength Balance
+    if (odd) {
+      d3.push({ n: "Three-Point Dumbbell Rows", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3("7", "8", "9", "10"), guide: "Tempo: 31X1. 90s rest" });
+    } else {
+      d3.push({ n: "Bent Over Dumbbell Rows", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3("7", "8", "9", "10"), guide: "Tempo: 31X1. 90s rest" });
+    }
+    // Strength Balance 2 (superset)
+    var ssD3sb2 = "ss-d3sb2-" + w;
+    if (odd) {
+      d3.push({ n: "Dumbbell Chest Flys", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3("7", "8", "9", "12"), ssGroup: ssD3sb2, guide: "30s between exercises, 120s after 2nd" });
+      d3.push({ n: "Dumbbell Shrugs", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3("7", "8", "9", "12"), ssGroup: ssD3sb2, guide: "30s between exercises, 120s after 2nd" });
+    } else {
+      d3.push({ n: "Alternating Dumbbell Bench", t: "accessory", tp: "Normal", cat: "strength_balance", s: [{ r: "12", rpe: "7" }, { r: "10", rpe: "8" }, { r: "8", rpe: "9" }], ssGroup: ssD3sb2, guide: "30s between exercises, 120s after 2nd" });
+      d3.push({ n: "Upright Rows", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3("7", "8", "9", "12"), ssGroup: ssD3sb2, guide: "30s between exercises, 120s after 2nd" });
+    }
+    // Finisher (superset)
+    var ssD3f = "ss-d3f-" + w;
+    if (odd) {
+      d3.push({ n: "Cable Tricep Extension", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD3f, guide: "Tempo: 30X0. 30s between exercises, 60s after 2nd" });
+      d3.push({ n: "Hammer Curls", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD3f, guide: "Tempo: 30X0. 30s between exercises, 60s after 2nd" });
+    } else {
+      d3.push({ n: "Dumbbell Tricep Extension", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD3f, guide: "Tempo: 30X0. 30s between exercises, 60s after 2nd" });
+      d3.push({ n: "Dumbbell Curls", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD3f, guide: "Tempo: 30X0. 30s between exercises, 60s after 2nd" });
+    }
+    // Plyometric
+    d3.push({ n: "Medicine Ball Slam", t: "plyo", tp: "Explosive", cat: "plyometric", s: s3flat("10"), guide: "60s rest" });
+
+    days["Day 3"] = { label: "Day 3 \u2014 " + dl["Day 3"], exercises: d3 };
+
+    // ═══ DAY 4: Lower Power ═══
+    var d4 = [];
+    // Warmup (superset)
+    var ssW4 = "ss-d4w-" + w;
+    d4.push({ n: "Wall Sits", t: "warmup", tp: "—", cat: "warmup", s: [{ r: "30s", rpe: "—" }, { r: "30s", rpe: "—" }], ssGroup: ssW4 });
+    d4.push({ n: "Single Leg Dumbbell Hip Thrusts", t: "warmup", tp: "—", cat: "warmup", s: s2flat("8"), ssGroup: ssW4 });
+    // Primary 1
+    if (odd) {
+      d4.push({ n: "Front Squat", t: "compound", tp: "Normal", cat: "primary", s: p1Reps(w), guide: "Tempo: 20X1. 180s rest. Use set 1 weight for set 4" });
+    } else {
+      d4.push({ n: "Zercher Squat", t: "compound", tp: "Normal", cat: "primary", s: p1Reps(w), guide: "Tempo: 20X1. 180s rest. Use set 1 weight for set 4" });
+    }
+    // Primary 2 (all weeks)
+    d4.push({ n: "Barbell Hip Thrusts", t: "compound", tp: "Normal", cat: "primary", s: p2Reps(w), guide: "Tempo: 20X1. 120s rest" });
+    // Strength Balance
+    if (odd) {
+      d4.push({ n: "Single Leg Dumbbell RDL", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3("7", "8", "9", "10/leg"), guide: "Tempo: 20X1. 90s rest" });
+    } else {
+      d4.push({ n: "Split Stance Dumbbell RDL", t: "accessory", tp: "Normal", cat: "strength_balance", s: s3("7", "8", "9", "10/leg"), guide: "Tempo: 20X1. 90s rest" });
+    }
+    // Finisher (superset)
+    var ssD4f = "ss-d4f-" + w;
+    if (odd) {
+      d4.push({ n: "Dumbbell Calf Raises", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD4f, guide: "Tempo: 31X1. 30s between exercises, 60s after 2nd" });
+      d4.push({ n: "Farmers Carry", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD4f, guide: "Tempo: 31X1. 30s between exercises, 60s after 2nd" });
+    } else {
+      d4.push({ n: "Single Leg Dumbbell Calf Raises", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD4f, guide: "Tempo: 31X1. 30s between exercises, 60s after 2nd" });
+      d4.push({ n: "Farmers Carry", t: "accessory", tp: "Normal", cat: "finisher", s: s3flat("12"), ssGroup: ssD4f, guide: "Tempo: 31X1. 30s between exercises, 60s after 2nd" });
+    }
+    // Plyometric
+    d4.push({ n: "Broad Jump", t: "plyo", tp: "Explosive", cat: "plyometric", s: s3flat("10"), guide: "60s rest" });
+
+    days["Day 4"] = { label: "Day 4 \u2014 " + dl["Day 4"], exercises: d4 };
+
+    weeks[w] = days;
+  }
+
+  // Build bank entries for all new exercises
+  var bank = [], seen = {};
+  var wks = Object.keys(weeks);
+  for (var wi = 0; wi < wks.length; wi++) {
+    var dks = Object.keys(weeks[wks[wi]]);
+    for (var di = 0; di < dks.length; di++) {
+      var exs = weeks[wks[wi]][dks[di]].exercises;
+      for (var ei = 0; ei < exs.length; ei++) {
+        if (!seen[exs[ei].n]) {
+          seen[exs[ei].n] = 1;
+          bank.push({ id: uid(), name: exs[ei].n, category: exs[ei].cat || "custom" });
+        }
+      }
+    }
+  }
+
+  return {
+    prog: { id: "cycle-2", name: "12-Week Pump Lift", phases: phases, weeks: weeks, totalWeeks: 12, daysPerWeek: 4 },
+    bank: bank
   };
 }
 
@@ -583,11 +835,22 @@ function rDay() {
     var ex = info.exercises[i];
     var cat = ex.cat || "primary";
     if (cat !== curCat) { curCat = cat; h += '<div class="sec">' + (catLabels[cat] || cat.toUpperCase()) + '</div>'; }
+
+    // Superset header
+    var isSSStart = !!ex.ssGroup && (i === 0 || info.exercises[i - 1].ssGroup !== ex.ssGroup);
+    var isSSEnd = !!ex.ssGroup && (i === info.exercises.length - 1 || info.exercises[i + 1].ssGroup !== ex.ssGroup);
+    if (isSSStart) {
+      var ssCt = 0;
+      for (var j = i; j < info.exercises.length && info.exercises[j].ssGroup === ex.ssGroup; j++) ssCt++;
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 16px"><div style="font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:1px">\u21c4 Superset \u2022 ' + ssCt + ' rounds</div></div>';
+    }
+
     var sc = ex.s.length, lc = 0;
     for (var si = 0; si < sc; si++) { var lg = D.logs[lk(c.id, dt, i, si)]; if (lg && lg.done) lc++; }
     var ad = lc === sc && sc > 0;
 
-    h += '<div class="exr" data-act="goex" data-dt="' + dt + '" data-i="' + i + '">';
+    var ssStyle = ex.ssGroup ? 'border-left:3px solid var(--acc);margin-left:20px;margin-right:16px;' + (isSSEnd ? '' : 'margin-bottom:4px;') : '';
+    h += '<div class="exr" style="' + ssStyle + '" data-act="goex" data-dt="' + dt + '" data-i="' + i + '">';
     h += '<div class="exr-dn' + (ad ? " ck" : "") + '">' + (ad ? SVG.chk : "") + '</div>';
     h += '<div class="exr-i"><div class="exr-n">' + esc(ex.n) + '</div>';
     h += '<div class="exr-m">' + sc + ' sets' + (ex.rest ? ' \u2022 Rest ' + esc(ex.rest) : '') + '</div></div>';
@@ -612,9 +875,11 @@ function rExDetail() {
 
   // Guidelines
   var gl = [];
-  if (ex.tp && ex.tp !== "—" && ex.tp !== "Normal") gl.push("Tempo: " + ex.tp);
-  if (ex.rest) gl.push("Rest: " + ex.rest + " between sets");
-  if (ex.cat) gl.push("Category: " + ex.cat.replace(/_/g, " "));
+  if (ex.guide) gl.push(ex.guide);
+  else {
+    if (ex.tp && ex.tp !== "—" && ex.tp !== "Normal") gl.push("Tempo: " + ex.tp);
+    if (ex.rest) gl.push("Rest: " + ex.rest + " between sets");
+  }
   if (gl.length) {
     h += '<div class="gbox"><div class="gbox-l">Guidelines</div><div class="gbox-t">' + gl.map(esc).join("<br>") + '</div></div>';
   }
@@ -641,9 +906,15 @@ function rExDetail() {
     } else {
       h += '<div class="star" style="font-size:11px;color:var(--dim)">Extra</div>';
     }
-    h += '<input type="number" inputmode="decimal" placeholder="\u2014" class="sinp" value="' + esc(lg.w || "") + '" data-act="logw" data-k="' + esc(k) + '">';
-    h += '<input type="number" inputmode="numeric" placeholder="\u2014" class="sinp" value="' + esc(lg.r || "") + '" data-act="logr" data-k="' + esc(k) + '">';
-    h += '<button class="schk' + (dn ? " dn" : "") + '" data-act="schk" data-k="' + esc(k) + '">' + (dn ? SVG.chk : "") + '</button>';
+    var enB64 = b64e(ex.n);
+    h += '<input type="number" inputmode="decimal" placeholder="\u2014" class="sinp" value="' + esc(lg.w || "") + '" data-act="logw" data-k="' + esc(k) + '" data-en="' + enB64 + '">';
+    h += '<input type="number" inputmode="numeric" placeholder="\u2014" class="sinp" value="' + esc(lg.r || "") + '" data-act="logr" data-k="' + esc(k) + '" data-en="' + enB64 + '">';
+    if (!tgt) {
+      // Extra set - show delete instead of check
+      h += '<button style="width:30px;height:30px;border-radius:50%;background:#fee;border:1px solid #fcc;color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0" data-act="rmextra" data-dt="' + dt + '" data-ei="' + ei + '" data-si="' + si + '">\u2212</button>';
+    } else {
+      h += '<button class="schk' + (dn ? " dn" : "") + '" data-act="schk" data-k="' + esc(k) + '" data-en="' + enB64 + '">' + (dn ? SVG.chk : "") + '</button>';
+    }
     h += '</div>';
   }
 
@@ -671,6 +942,26 @@ function rExDetail() {
       h += '<div class="hdt' + (isOpen ? " open" : "") + '" data-act="thist" data-hd="' + hdt + '"><span>' + fmt(hdt) + '</span>' + SVG.down + '</div>';
       if (isOpen) {
         h += '<div class="hdtl">';
+        // Show guidelines for that historical date
+        var histInfo = exsFor(hdt);
+        if (histInfo) {
+          // Find the exercise by name in that date's workout
+          for (var hei = 0; hei < histInfo.exercises.length; hei++) {
+            if (histInfo.exercises[hei].n === ex.n) {
+              var hEx = histInfo.exercises[hei];
+              var hgl = [];
+              if (hEx.guide) hgl.push(hEx.guide);
+              else {
+                if (hEx.tp && hEx.tp !== "—" && hEx.tp !== "Normal") hgl.push("Tempo: " + hEx.tp);
+                if (hEx.rest) hgl.push("Rest: " + hEx.rest);
+              }
+              if (hgl.length) {
+                h += '<div style="font-size:11px;color:var(--blue);background:var(--bluebg);border-radius:6px;padding:6px 8px;margin-bottom:6px">' + hgl.map(esc).join(" \u2022 ") + '</div>';
+              }
+              break;
+            }
+          }
+        }
         for (var he = 0; he < histForOther.length; he++) {
           if (histForOther[he].date === hdt) {
             var e = histForOther[he];
@@ -767,13 +1058,16 @@ function rEdCycle() {
   var cc = null;
   for (var i = 0; i < D.cycles.length; i++) { if (D.cycles[i].id === ST.sd.cid) cc = D.cycles[i]; }
   if (!cc) return "";
-  var h = '<div class="dh"><button class="dh-bk" data-act="back">' + SVG.bkleft + '</button><div class="dh-t">' + esc(cc.name) + '</div></div>';
+  var h = '<div class="dh"><button class="dh-bk" data-act="back">' + SVG.bkleft + '</button><div style="flex:1;min-width:0"><input class="edinp" style="width:100%;font-size:18px;font-weight:800;border:1px solid transparent;padding:4px 8px" value="' + esc(cc.name) + '" data-act="rencyc" data-cid="' + cc.id + '"></div></div>';
   if (cc.id !== D.aid) h += '<div style="padding:0 16px 8px"><button class="btnacc" data-act="setaid" data-cid="' + cc.id + '">Set as Active Cycle</button></div>';
 
   // Delete cycle button (can't delete if it's the only cycle)
   if (D.cycles.length > 1) {
     h += '<div style="padding:0 16px 12px"><button style="width:100%;padding:12px;border-radius:var(--rs);background:#fee;border:1px solid #fcc;color:var(--acc);font-size:14px;font-weight:700;text-align:center;cursor:pointer" data-act="delcyc" data-cid="' + cc.id + '">Delete This Cycle</button></div>';
   }
+
+  // Duplicate cycle button
+  h += '<div style="padding:0 16px 12px"><button style="width:100%;padding:12px;border-radius:var(--rs);background:var(--bluebg);border:1px solid var(--bluebdr);color:var(--blue);font-size:14px;font-weight:700;text-align:center;cursor:pointer" data-act="dupcyc" data-cid="' + cc.id + '">Duplicate This Cycle</button></div>';
 
   for (var pi = 0; pi < cc.phases.length; pi++) {
     var ph = cc.phases[pi];
@@ -800,32 +1094,59 @@ function rEdDay() {
   var day = cc.weeks[w][dk];
 
   var h = '<div class="dh"><button class="dh-bk" data-act="edback">' + SVG.bkleft + '</button><div class="dh-t">Week ' + w + ' \u2014 ' + esc(dk) + '</div></div>';
-  h += '<div style="padding:0 16px 16px">';
+  h += '<div style="padding:0 16px 16px;max-width:100%">';
   var ec = day.exercises.length;
   for (var ei = 0; ei < ec; ei++) {
     var ex = day.exercises[ei];
-    h += '<div class="edex">';
-    // Reorder + name + cat + delete
-    h += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">';
-    h += '<div style="display:flex;flex-direction:column;gap:2px">';
+    var isSSStart = !!ex.ssGroup && (ei === 0 || day.exercises[ei - 1].ssGroup !== ex.ssGroup);
+    var isSSEnd = !!ex.ssGroup && (ei === ec - 1 || day.exercises[ei + 1].ssGroup !== ex.ssGroup);
+    var isSSMid = !!ex.ssGroup && !isSSStart && !isSSEnd;
+
+    // Superset group header
+    if (isSSStart) {
+      var ssCount = 0;
+      for (var j = ei; j < ec && day.exercises[j].ssGroup === ex.ssGroup; j++) ssCount++;
+      h += '<div style="background:var(--accbg);border:1px solid var(--accbdr);border-bottom:none;border-radius:var(--rs) var(--rs) 0 0;padding:8px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">';
+      h += '<div style="font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:1px">\u21c4 SUPERSET \u2022 ' + ssCount + ' exercises</div>';
+      h += '<button style="font-size:11px;color:var(--txt3);background:var(--card);border:1px solid var(--bdr);border-radius:4px;padding:2px 8px;cursor:pointer" data-act="unss" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">Ungroup</button>';
+      h += '</div>';
+    }
+
+    var ssStyle = ex.ssGroup ? 'border-left:3px solid var(--acc);margin-bottom:0;' + (isSSStart ? 'border-radius:0' : '') + (isSSEnd ? 'border-radius:0 0 var(--rs) var(--rs);margin-bottom:8px' : 'border-radius:0') : '';
+    h += '<div class="edex" style="' + ssStyle + '">';
+
+    // Row 1: name with picker + delete exercise
+    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">';
+    h += '<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">';
     h += '<button class="edmv ' + (ei > 0 ? "on" : "off") + '" ' + (ei > 0 ? 'data-act="mvex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-dir="-1"' : '') + '>\u25b2</button>';
     h += '<button class="edmv ' + (ei < ec - 1 ? "on" : "off") + '" ' + (ei < ec - 1 ? 'data-act="mvex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-dir="1"' : '') + '>\u25bc</button>';
     h += '</div>';
-    h += '<button class="edinp" style="text-align:left;cursor:pointer;background:var(--card);flex:1" data-act="pickex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">' + esc(ex.n) + ' <span style="color:var(--acc);font-size:11px">\u25b8</span></button>';
-    h += '<select class="edsel" data-act="edcat" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">';
+    h += '<button class="edinp" style="text-align:left;cursor:pointer;background:var(--card);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-act="pickex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">' + esc(ex.n) + ' <span style="color:var(--acc);font-size:11px">\u25b8</span></button>';
+    h += '<button class="eddel" style="flex-shrink:0" data-act="delex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">\u00d7</button>';
+    h += '</div>';
+
+    // Row 2: category selector
+    h += '<div style="margin-bottom:6px"><select class="edsel" style="width:100%" data-act="edcat" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">';
     var catOpts = ["warmup", "primary", "strength_balance", "finisher", "plyometric", "cooldown", "custom"];
     for (var ci = 0; ci < catOpts.length; ci++) h += '<option value="' + catOpts[ci] + '"' + (ex.cat === catOpts[ci] ? " selected" : "") + '>' + catOpts[ci].replace(/_/g, " ") + '</option>';
-    h += '</select>';
-    h += '<button class="eddel" data-act="delex" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">\u00d7</button></div>';
+    h += '</select></div>';
+
+    // Row 2: guidelines input
+    h += '<div style="margin-bottom:6px"><input class="edinp" style="width:100%;font-size:12px;font-weight:400;color:var(--txt2)" value="' + esc(ex.guide || "") + '" placeholder="Guidelines (tempo, rest, notes...)" data-act="edguide" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '"></div>';
+
+    // Row 3: superset toggle (only if not already in a group, or at end of group to add next)
+    if (!ex.ssGroup && ei < ec - 1) {
+      h += '<div style="margin-bottom:6px"><button style="font-size:11px;color:var(--acc);background:var(--accbg);border:1px solid var(--accbdr);border-radius:4px;padding:3px 8px;cursor:pointer" data-act="mkss" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">\u21c4 Superset with next</button></div>';
+    }
 
     // Sets
     for (var si = 0; si < ex.s.length; si++) {
       var s = ex.s[si];
-      h += '<div style="display:grid;grid-template-columns:20px 1fr 1fr 24px;gap:6px;align-items:center;margin-bottom:3px">';
+      h += '<div style="display:grid;grid-template-columns:20px 2fr 2fr 36px;gap:4px;align-items:center;margin-bottom:3px">';
       h += '<div style="font-size:11px;color:var(--txt3);text-align:center">' + (si + 1) + '</div>';
-      h += '<input class="edinp" style="text-align:center;font-size:12px" value="' + esc(s.r) + '" placeholder="Reps" data-act="edsetr" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-si="' + si + '">';
-      h += '<input class="edinp" style="text-align:center;font-size:12px" value="' + esc(s.rpe) + '" placeholder="RPE" data-act="edsetrpe" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-si="' + si + '">';
-      h += '<button style="background:none;border:none;color:#ff6666;cursor:pointer;font-size:16px;font-weight:700" data-act="delset" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-si="' + si + '">\u2212</button></div>';
+      h += '<input class="edinp" style="text-align:center;font-size:12px;padding:6px 4px" value="' + esc(s.r) + '" placeholder="Reps" data-act="edsetr" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-si="' + si + '">';
+      h += '<input class="edinp" style="text-align:center;font-size:12px;padding:6px 4px" value="' + esc(s.rpe) + '" placeholder="RPE" data-act="edsetrpe" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-si="' + si + '">';
+      h += '<button style="width:28px;height:28px;border-radius:50%;background:#fee;border:1px solid #fcc;color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer" data-act="delset" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '" data-si="' + si + '">\u2212</button></div>';
     }
     h += '<button style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:var(--rx);background:rgba(74,144,217,.1);border:1px solid rgba(74,144,217,.3);color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;margin-top:4px" data-act="addset2" data-cid="' + cid + '" data-w="' + w + '" data-dk="' + dk + '" data-ei="' + ei + '">+ Set</button>';
     h += '</div>';
@@ -841,10 +1162,15 @@ function rEdDay() {
 function rStats() {
   var c = cy(), names = allNames();
   var totalLogs = 0, keys = Object.keys(D.logs || {});
-  for (var i = 0; i < keys.length; i++) { if (keys[i].indexOf(c.id) === 0 && D.logs[keys[i]].done) totalLogs++; }
+  for (var i = 0; i < keys.length; i++) { if (D.logs[keys[i]] && D.logs[keys[i]].done) totalLogs++; }
   var completedDays = 0;
-  var doneKeys = Object.keys(D.done[c.id] || {});
-  for (var i = 0; i < doneKeys.length; i++) { if (D.done[c.id][doneKeys[i]]) completedDays++; }
+  // Count across all cycles
+  var allDoneKeys = Object.keys(D.done || {});
+  for (var di = 0; di < allDoneKeys.length; di++) {
+    var cyDone = D.done[allDoneKeys[di]];
+    var dkArr = Object.keys(cyDone || {});
+    for (var dk = 0; dk < dkArr.length; dk++) { if (cyDone[dkArr[dk]]) completedDays++; }
+  }
 
   var h = '<div style="padding:16px 16px 8px;font-size:22px;font-weight:800">Stats</div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 16px">';
@@ -912,7 +1238,7 @@ function openSwapModal(dt, idx) {
   var bank = getBank();
   window._swapCtx = { dt: dt, idx: idx };
 
-  var h = '<div class="mov" data-act="closemod"><div class="mod" onclick="event.stopPropagation()">';
+  var h = '<div class="mov" data-act="closemod"><div class="mod" data-modal="inner">';
   h += '<div class="mha"></div><div class="mti">Swap: ' + esc(curEx.n) + '</div>';
   h += '<input class="minp" id="swp-q" placeholder="Search exercises..." data-act="swpfilter" style="margin-bottom:12px">';
   h += '<div id="swp-list">';
@@ -939,7 +1265,7 @@ function openPickerModal(cid, w, dk, ei) {
   cats.sort();
   window._pickCtx = { cid: cid, w: parseInt(w), dk: dk, ei: parseInt(ei) };
 
-  var h = '<div class="mov" data-act="closemod"><div class="mod" onclick="event.stopPropagation()">';
+  var h = '<div class="mov" data-act="closemod"><div class="mod" data-modal="inner">';
   h += '<div class="mha"></div><div class="mti">Choose Exercise</div>';
   h += '<input class="minp" id="pick-q" placeholder="Search exercises..." data-act="pickfilter" style="margin-bottom:12px">';
   h += '<div id="pick-cr" class="hidden" style="margin-bottom:12px"><button class="mbtn" data-act="pickcreate" id="pick-cr-btn">+ Create New</button></div>';
@@ -959,7 +1285,7 @@ function openPickerModal(cid, w, dk, ei) {
 }
 
 function openAddBankModal() {
-  var h = '<div class="mov" data-act="closemod"><div class="mod" onclick="event.stopPropagation()">';
+  var h = '<div class="mov" data-act="closemod"><div class="mod" data-modal="inner">';
   h += '<div class="mha"></div><div class="mti">Add Exercise</div>';
   h += '<input class="minp" id="nb-name" placeholder="Exercise name...">';
   h += '<select class="minp" id="nb-cat"><option value="primary">Primary</option><option value="strength_balance">Strength Balance</option><option value="finisher">Finisher</option><option value="plyometric">Plyometric</option><option value="warmup">Warmup</option><option value="cooldown">Cooldown</option><option value="custom">Custom</option></select>';
@@ -982,7 +1308,7 @@ document.addEventListener("click", function (e) {
 
   // Skip click handling for inputs/selects - let native pickers work
   var tag = el.tagName.toLowerCase();
-  if ((tag === "input" || tag === "select" || tag === "textarea") && (act === "setstart" || act === "setmap" || act === "edcat" || act === "edsetr" || act === "edsetrpe" || act === "logw" || act === "logr" || act === "cmt" || act === "swpfilter" || act === "pickfilter")) return;
+  if ((tag === "input" || tag === "select" || tag === "textarea") && (act === "setstart" || act === "setmap" || act === "edcat" || act === "edsetr" || act === "edsetrpe" || act === "edguide" || act === "rencyc" || act === "logw" || act === "logr" || act === "cmt" || act === "swpfilter" || act === "pickfilter")) return;
 
   switch (act) {
     // Navigation
@@ -1003,12 +1329,14 @@ document.addEventListener("click", function (e) {
     }
 
     // Exercise detail
-    case "logw": { var k = el.dataset.k; if (!D.logs[k]) D.logs[k] = {}; D.logs[k].w = el.value; D.logs[k].dt = today(); save(); break; }
-    case "logr": { var k2 = el.dataset.k; if (!D.logs[k2]) D.logs[k2] = {}; D.logs[k2].r = el.value; D.logs[k2].dt = today(); save(); break; }
+    case "logw": { var k = el.dataset.k; if (!D.logs[k]) D.logs[k] = {}; D.logs[k].w = el.value; D.logs[k].dt = today(); if (el.dataset.en) D.logs[k].en = b64d(el.dataset.en); save(); break; }
+    case "logr": { var k2 = el.dataset.k; if (!D.logs[k2]) D.logs[k2] = {}; D.logs[k2].r = el.value; D.logs[k2].dt = today(); if (el.dataset.en) D.logs[k2].en = b64d(el.dataset.en); save(); break; }
     case "schk": {
       var k3 = el.dataset.k;
       if (!D.logs[k3]) D.logs[k3] = {};
-      D.logs[k3].done = !D.logs[k3].done; save();
+      D.logs[k3].done = !D.logs[k3].done;
+      if (el.dataset.en) D.logs[k3].en = b64d(el.dataset.en);
+      save();
       el.classList.toggle("dn", D.logs[k3].done);
       el.innerHTML = D.logs[k3].done ? SVG.chk : "";
       break;
@@ -1018,6 +1346,18 @@ document.addEventListener("click", function (e) {
       if (!D.logs[eKey]) D.logs[eKey] = { count: 0 };
       D.logs[eKey].count++; save(); render(); break;
     }
+    case "rmextra": {
+      var rc = cy(), rdt = el.dataset.dt, rei = el.dataset.ei, rsi = parseInt(el.dataset.si);
+      var rKey = rc.id + "__" + rdt + "__extra__" + rei;
+      if (D.logs[rKey] && D.logs[rKey].count > 0) {
+        D.logs[rKey].count--;
+        // Also remove the log data for this set
+        var rmk = lk(rc.id, rdt, parseInt(rei), rsi);
+        delete D.logs[rmk];
+        save(); render();
+      }
+      break;
+    }
     case "cmt": {
       if (!D.cmt) D.cmt = {};
       D.cmt[el.dataset.ck] = el.value; save(); break;
@@ -1025,7 +1365,11 @@ document.addEventListener("click", function (e) {
     case "thist": ST.histOpen[el.dataset.hd] = !ST.histOpen[el.dataset.hd]; render(); break;
 
     // Swap modal
-    case "closemod": closeModal(); break;
+    case "closemod": {
+      // Only close if click was on the overlay, not inside the modal
+      if (e.target.closest("[data-modal='inner']")) break;
+      closeModal(); break;
+    }
     case "doswap": {
       var ctx = window._swapCtx; if (!ctx) break;
       var nm = b64d(el.dataset.bn);
@@ -1034,15 +1378,6 @@ document.addEventListener("click", function (e) {
       if (!D.ov[c3.id][ctx.dt]) D.ov[c3.id][ctx.dt] = {};
       D.ov[c3.id][ctx.dt][ctx.idx] = { n: nm };
       save(); closeModal(); render(); break;
-    }
-    case "swpfilter": {
-      var q = (el.value || "").toLowerCase().trim();
-      var items = document.querySelectorAll(".swp-it");
-      items.forEach(function (it) { it.style.display = (!q || it.dataset.name.toLowerCase().indexOf(q) >= 0) ? "" : "none"; });
-      var cr = $("swp-cr"), crb = $("swp-cr-btn");
-      if (q) { cr.classList.remove("hidden"); crb.textContent = '+ Create "' + q + '" & Swap'; }
-      else { cr.classList.add("hidden"); }
-      break;
     }
     case "swpcreate": {
       var qv = ($("swp-q") || {}).value || ""; qv = qv.trim();
@@ -1070,10 +1405,23 @@ document.addEventListener("click", function (e) {
     case "goedcyc": W.goSub("edcyc", { cid: el.dataset.cid }); break;
     case "goedday": W.goSub("edday", { cid: el.dataset.cid, w: parseInt(el.dataset.w), dk: el.dataset.dk }); break;
     case "addcyc": {
+      var acH = '<div class="mov" data-act="closemod"><div class="mod" data-modal="inner">';
+      acH += '<div class="mha"></div><div class="mti">New Cycle</div>';
+      acH += '<input class="minp" id="nc-name" placeholder="Cycle name..." value="">';
+      acH += '<button class="mbtn" data-act="doaddcyc">Create Cycle</button>';
+      acH += '</div></div>';
+      $("modal").innerHTML = acH;
+      setTimeout(function () { var el2 = $("nc-name"); if (el2) el2.focus(); }, 100);
+      break;
+    }
+    case "doaddcyc": {
+      var ncName = ($("nc-name") || {}).value || "";
+      ncName = ncName.trim();
+      if (!ncName) ncName = "New Cycle " + (D.cycles.length + 1);
       var built = mkProg();
       built.prog.id = "cycle-" + uid();
-      built.prog.name = "New Cycle " + (D.cycles.length + 1);
-      D.cycles.push(built.prog); D.aid = built.prog.id; save(); render(); break;
+      built.prog.name = ncName;
+      D.cycles.push(built.prog); D.aid = built.prog.id; save(); closeModal(); render(); break;
     }
     case "setaid": D.aid = el.dataset.cid; save(); render(); break;
     case "delcyc": {
@@ -1106,17 +1454,41 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "pickex": openPickerModal(el.dataset.cid, el.dataset.w, el.dataset.dk, el.dataset.ei); break;
-    case "pickfilter": {
-      var q2 = (el.value || "").toLowerCase().trim();
-      document.querySelectorAll(".pick-it").forEach(function (it) { it.style.display = (!q2 || it.dataset.name.toLowerCase().indexOf(q2) >= 0) ? "" : "none"; });
-      document.querySelectorAll(".pick-cat").forEach(function (cat) {
-        var vis = cat.querySelectorAll('.pick-it:not([style*="display: none"])');
-        cat.style.display = vis.length > 0 ? "" : "none";
-      });
-      var cr2 = $("pick-cr"), crb2 = $("pick-cr-btn");
-      if (q2) { cr2.classList.remove("hidden"); crb2.textContent = '+ Create "' + q2 + '"'; }
-      else { cr2.classList.add("hidden"); }
+    case "dupcyc": {
+      var srcCid = el.dataset.cid;
+      var srcCyc = null;
+      for (var di = 0; di < D.cycles.length; di++) { if (D.cycles[di].id === srcCid) srcCyc = D.cycles[di]; }
+      if (!srcCyc) break;
+      var newCyc = JSON.parse(JSON.stringify(srcCyc));
+      newCyc.id = "cycle-" + uid();
+      newCyc.name = srcCyc.name + " (Copy)";
+      D.cycles.push(newCyc);
+      save();
+      W.goSub("edcyc", { cid: newCyc.id });
       break;
+    }
+    case "mkss": {
+      var mcc = null;
+      for (var mi = 0; mi < D.cycles.length; mi++) { if (D.cycles[mi].id === el.dataset.cid) mcc = D.cycles[mi]; }
+      if (!mcc) break;
+      var mExs = mcc.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises;
+      var mEi = parseInt(el.dataset.ei);
+      var grpId = "ss-" + uid();
+      mExs[mEi].ssGroup = grpId;
+      if (mEi + 1 < mExs.length) mExs[mEi + 1].ssGroup = grpId;
+      save(); render(); break;
+    }
+    case "unss": {
+      var ucc = null;
+      for (var ui = 0; ui < D.cycles.length; ui++) { if (D.cycles[ui].id === el.dataset.cid) ucc = D.cycles[ui]; }
+      if (!ucc) break;
+      var uExs = ucc.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises;
+      var uEi = parseInt(el.dataset.ei);
+      var uGrp = uExs[uEi].ssGroup;
+      if (uGrp) {
+        for (var uk = 0; uk < uExs.length; uk++) { if (uExs[uk].ssGroup === uGrp) delete uExs[uk].ssGroup; }
+      }
+      save(); render(); break;
     }
     case "dopick": {
       var ctx3 = window._pickCtx; if (!ctx3) break;
@@ -1212,20 +1584,17 @@ document.addEventListener("click", function (e) {
 // Calendar day clicks - handled in main document click handler above
 // (removed separate cnt listener to avoid event ordering issues)
 
-// Input change events (for data-act on inputs/selects/textareas)
+// Input events (for filtering, logging, comments, editor)
 $("cnt").addEventListener("input", function (e) {
   var el = e.target.closest("[data-act]");
   if (!el) return;
   var act = el.dataset.act;
-  if (act === "swpfilter" || act === "pickfilter") {
-    // Trigger the filter
-    el.dispatchEvent(new Event("click", { bubbles: true }));
-  }
   if (act === "logw" || act === "logr") {
     var k = el.dataset.k;
     if (!D.logs[k]) D.logs[k] = {};
     D.logs[k][act === "logw" ? "w" : "r"] = el.value;
     D.logs[k].dt = today();
+    if (el.dataset.en) D.logs[k].en = b64d(el.dataset.en);
     save();
   }
   if (act === "cmt") {
@@ -1239,6 +1608,55 @@ $("cnt").addEventListener("input", function (e) {
       var field = act === "edsetr" ? "r" : "rpe";
       cc.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises[parseInt(el.dataset.ei)].s[parseInt(el.dataset.si)][field] = el.value;
       save();
+    }
+  }
+  if (act === "edguide") {
+    var gcc = null;
+    for (var gi = 0; gi < D.cycles.length; gi++) { if (D.cycles[gi].id === el.dataset.cid) gcc = D.cycles[gi]; }
+    if (gcc) {
+      gcc.weeks[parseInt(el.dataset.w)][el.dataset.dk].exercises[parseInt(el.dataset.ei)].guide = el.value;
+      save();
+    }
+  }
+  if (act === "rencyc") {
+    var rcc = null;
+    for (var ri = 0; ri < D.cycles.length; ri++) { if (D.cycles[ri].id === el.dataset.cid) rcc = D.cycles[ri]; }
+    if (rcc) { rcc.name = el.value; save(); $("cyc-name").textContent = cy().name; }
+  }
+});
+
+// Filter events for modals (these are in #modal, not #cnt)
+document.addEventListener("input", function (e) {
+  var el = e.target.closest("[data-act]");
+  if (!el) return;
+  var act = el.dataset.act;
+  var q = (el.value || "").toLowerCase().trim();
+
+  if (act === "swpfilter") {
+    var items = document.querySelectorAll(".swp-it");
+    for (var i = 0; i < items.length; i++) {
+      items[i].style.display = (!q || items[i].dataset.name.toLowerCase().indexOf(q) >= 0) ? "" : "none";
+    }
+    var cr = $("swp-cr"), crb = $("swp-cr-btn");
+    if (cr) {
+      if (q) { cr.classList.remove("hidden"); crb.textContent = '+ Create "' + q + '" & Swap'; }
+      else { cr.classList.add("hidden"); }
+    }
+  }
+  if (act === "pickfilter") {
+    var pitems = document.querySelectorAll(".pick-it");
+    for (var j = 0; j < pitems.length; j++) {
+      pitems[j].style.display = (!q || pitems[j].dataset.name.toLowerCase().indexOf(q) >= 0) ? "" : "none";
+    }
+    var cats = document.querySelectorAll(".pick-cat");
+    for (var k = 0; k < cats.length; k++) {
+      var vis = cats[k].querySelectorAll('.pick-it:not([style*="display: none"])');
+      cats[k].style.display = vis.length > 0 ? "" : "none";
+    }
+    var cr2 = $("pick-cr"), crb2 = $("pick-cr-btn");
+    if (cr2) {
+      if (q) { cr2.classList.remove("hidden"); crb2.textContent = '+ Create "' + q + '"'; }
+      else { cr2.classList.add("hidden"); }
     }
   }
 });
@@ -1307,6 +1725,19 @@ if (!D.done) D.done = {};
 if (!D.ov) D.ov = {};
 if (!D.cmt) D.cmt = {};
 if (!D.bank) D.bank = initData().bank;
+// Migration: add the new 12-Week Pump Lift cycle if not present
+var hasCycle2 = false;
+for (var mc = 0; mc < D.cycles.length; mc++) { if (D.cycles[mc].id === "cycle-2") hasCycle2 = true; }
+if (!hasCycle2) {
+  var built2 = mkProg2();
+  D.cycles.push(built2.prog);
+  // Merge new exercises into bank
+  var bankMap = {};
+  for (var bm = 0; bm < D.bank.length; bm++) bankMap[D.bank[bm].name] = 1;
+  for (var bn = 0; bn < built2.bank.length; bn++) {
+    if (!bankMap[built2.bank[bn].name]) { D.bank.push(built2.bank[bn]); }
+  }
+}
 save();
 render();
 </script>
